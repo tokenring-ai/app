@@ -1,0 +1,15 @@
+{
+  "name": "@tokenring-ai/app",
+  "version": "0.1.0",
+  "description": "Base app class for TokenRing applications, which provides a registry of services and an attachment point for plugins.",
+  "dependencies": {
+    "@tokenring-ai/utility": "0.1.0"
+  },
+  "exports": {
+    ".": "./index.ts",
+    "./*": "./*.ts"
+  },
+  "types": "./index.ts",
+  "license": "MIT",
+  "type": "module"
+}
