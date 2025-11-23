@@ -89,9 +89,8 @@ Services provide functionality to the application and can attach to agents.
 interface TokenRingService {
   name: string;
   description: string;
-  install?(app: TokenRingApp): void;
-  start?(app: TokenRingApp): Promise<void> | void;
-  stop?(app: TokenRingApp): Promise<void> | void;
+  start?(): Promise<void> | void;
+  stop?(): Promise<void> | void;
   attach?(agent: Agent): Promise<void> | void;
   detach?(agent: Agent): Promise<void> | void;
   getContextItems?(agent: Agent): AsyncGenerator<ContextItem>;

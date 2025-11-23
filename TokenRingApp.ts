@@ -20,7 +20,7 @@ export default class TokenRingApp {
   getServices = this.services.getItems;
   addServices(...services: TokenRingService[]) {
     this.services.register(...services);
-    services.forEach(service => service.install?.(this));
+    services.forEach(service => service.start?.());
   }
 
   waitForService = <R extends TokenRingService>(
@@ -32,7 +32,6 @@ export default class TokenRingApp {
     });
   }
 
-
   /**
    * Log a system message
    */
@@ -43,11 +42,6 @@ export default class TokenRingApp {
   serviceError(...msgs: any[]): void {
     console.error(formatLogMessages(msgs));
   }
-
-  private stateManager = new StateManager();
-  initializeState = this.stateManager.initializeState.bind(this.stateManager);
-  mutateState = this.stateManager.mutateState.bind(this.stateManager);
-  getState = this.stateManager.getState.bind(this.stateManager);
 
   getConfigSlice<T extends z.ZodTypeAny>(key: string, schema: T): z.infer<T> {
     try {
