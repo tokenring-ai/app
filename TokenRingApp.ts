@@ -1,6 +1,5 @@
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
-import StateManager from "./StateManager.ts";
 import type {TokenRingService} from "./types.ts";
 import {z} from "zod";
 
@@ -8,7 +7,7 @@ import {z} from "zod";
 export type TokenRingAppConfig = Record<string, any>;
 
 export default class TokenRingApp {
-  private config: TokenRingAppConfig;
+  private readonly config: TokenRingAppConfig;
   constructor(config: TokenRingAppConfig) {
     this.config = config;
   }
