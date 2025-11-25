@@ -19,9 +19,5 @@ export default class PluginManager implements TokenRingService {
     await Promise.all(
       this.plugins.getItems().map(plugin => plugin.start?.(app))
     );
-
-    await Promise.all(
-      app.services.getItems().map(service => service.start?.())
-    );
   }
 }
