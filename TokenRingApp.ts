@@ -4,12 +4,13 @@ import type {TokenRingService} from "./types.ts";
 import {z} from "zod";
 
 
-export type TokenRingAppConfig = Record<string, any>;
+export const TokenRingAppConfigSchema = z.record(z.string(), z.any());
+export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
 
 export default class TokenRingApp {
   private readonly config: TokenRingAppConfig;
-  constructor(config: TokenRingAppConfig) {
-    this.config = config;
+  constructor(config: TokenRingAppConfig, defaultConfig: TokenRingAppConfig = {}) {
+    this.config = {...defaultConfig, ...config};
   }
 
   services = new TypedRegistry<TokenRingService>();
