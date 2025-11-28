@@ -35,12 +35,12 @@ export default class TokenRingApp {
   /**
    * Log a system message
    */
-  serviceOutput(...msgs: any[]): void {
-    console.log(formatLogMessages(msgs));
+  serviceOutput(...messages: any[]): void {
+    console.log(formatLogMessages(messages));
   }
 
-  serviceError(...msgs: any[]): void {
-    console.error(formatLogMessages(msgs));
+  serviceError(...messages: any[]): void {
+    console.error(formatLogMessages(messages));
   }
 
   /**
