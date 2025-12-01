@@ -22,5 +22,5 @@ export interface TokenRingService {
 
   detach?(agent: Agent): Promise<void> | void;
 
-  getContextItems?(agent: Agent): AsyncGenerator<ContextItem>;
+  getContextItems?: never;
 }

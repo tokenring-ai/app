@@ -43,6 +43,28 @@ export default class TokenRingApp {
     console.error(formatLogMessages(messages));
   }
 
+  /*
+   * Track an app-level promise and log any errors that occur.
+   */
+  trackPromise(prom: Promise<void>) : void {
+    prom.catch((err) => this.serviceError("[TokenRingApp] Error:", err));
+  }
+
+  scheduleEvery(interval: number, callback: () => Promise<void>) : () => void {
+    let cancelled = false;
+    let timer: NodeJS.Timeout | undefined = undefined;
+    while (!cancelled) {
+      callback()
+        .catch((err) => this.serviceError("[TokenRingApp] Error:", err))
+        .then(() => timer = setTimeout(callback, interval));
+    }
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }
+
   /**
    * Get a config value by key and parse it using the provided schema
    */
