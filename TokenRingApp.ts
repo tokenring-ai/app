@@ -52,12 +52,21 @@ export default class TokenRingApp {
 
   scheduleEvery(interval: number, callback: () => Promise<void>) : () => void {
     let cancelled = false;
+
     let timer: NodeJS.Timeout | undefined = undefined;
-    while (!cancelled) {
-      callback()
-        .catch((err) => this.serviceError("[TokenRingApp] Error:", err))
-        .then(() => timer = setTimeout(callback, interval));
-    }
+
+    const run = async () =>  {
+      if (cancelled) return;
+      try {
+        await callback();
+      } catch (err) {
+        this.serviceError("[TokenRingApp] Error:", err);
+      } finally {
+        if (! cancelled) timer = setTimeout(run, interval);
+      }
+    };
+
+    this.trackPromise(run());
 
     return () => {
       cancelled = true;
