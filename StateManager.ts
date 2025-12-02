@@ -20,6 +20,7 @@ export interface StateStorageInterface<SpecificStateSliceType extends Serializab
 
 export default class StateManager<SpecificStateSliceType extends SerializableStateSlice> implements StateStorageInterface<SpecificStateSliceType> {
   state = new Map<string, SpecificStateSliceType>();
+  private subscribers = new Map<string, Set<(state: any) => void>>();
 
   initializeState<S, T extends SpecificStateSliceType>(
     ClassType: new (props: S) => T,
@@ -36,7 +37,9 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     if (!state) {
       throw new Error(`State slice ${ClassType.name} not found`);
     }
-    return callback(state);
+    const result = callback(state);
+    this.subscribers.get(ClassType.name)?.forEach(cb => cb(state));
+    return result;
   }
 
   getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T {
@@ -74,4 +77,64 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
   entries(): IterableIterator<[string, SerializableStateSlice]> {
     return this.state.entries();
   }
+
+  subscribe<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+    callback: (state: T) => void,
+  ): () => void {
+    const key = ClassType.name;
+    if (!this.subscribers.has(key)) {
+      this.subscribers.set(key, new Set());
+    }
+    this.subscribers.get(key)!.add(callback);
+
+    queueMicrotask(() => {
+      if (this.subscribers.get(key)?.has(callback)) {
+        callback(this.getState(ClassType))
+      }
+    });
+
+    return () => this.subscribers.get(key)?.delete(callback);
+  }
+
+  async timedWaitForState<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+    predicate: (state: T) => boolean,
+    timeoutMs: number,
+  ): Promise<T> {
+    const state = this.getState(ClassType);
+    if (predicate(state)) {
+      return state;
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        unsubscribe();
+        reject(new Error(`Timeout waiting for state ${ClassType.name}`));
+      }, timeoutMs);
+
+      const unsubscribe = this.subscribe(ClassType, (state) => {
+        if (predicate(state)) {
+          clearTimeout(timeout);
+          unsubscribe();
+          resolve(state);
+        }
+      });
+    });
+  }
+
+  async waitForState<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+    predicate: (state: T) => boolean,
+  ): Promise<T> {
+    return new Promise((resolve) => {
+      const unsubscribe = this.subscribe(ClassType, (state) => {
+        if (predicate(state)) {
+          unsubscribe();
+          resolve(state);
+        }
+      });
+    });
+  }
+
 }
