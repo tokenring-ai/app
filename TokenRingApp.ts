@@ -7,8 +7,16 @@ import {z} from "zod";
 export const TokenRingAppConfigSchema = z.record(z.string(), z.any());
 export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
 
+export type LogEntry = {
+  timestamp: number;
+  level: "info" | "error";
+  message: string;
+};
+
 export default class TokenRingApp {
   private readonly config: TokenRingAppConfig;
+  readonly logs: LogEntry[] = [];
+  
   constructor(config: TokenRingAppConfig, defaultConfig: TokenRingAppConfig = {}) {
     this.config = {...defaultConfig, ...config};
   }
@@ -36,11 +44,13 @@ export default class TokenRingApp {
    * Log a system message
    */
   serviceOutput(...messages: any[]): void {
-    console.log(formatLogMessages(messages));
+    const message = formatLogMessages(messages);
+    this.logs.push({ timestamp: Date.now(), level: "info", message });
   }
 
   serviceError(...messages: any[]): void {
-    console.error(formatLogMessages(messages));
+    const message = formatLogMessages(messages);
+    this.logs.push({ timestamp: Date.now(), level: "error", message });
   }
 
   /*
