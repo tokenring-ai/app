@@ -16,6 +16,7 @@ export type LogEntry = {
 export default class TokenRingApp {
   private readonly config: TokenRingAppConfig;
   readonly logs: LogEntry[] = [];
+  started: boolean = false;
   
   constructor(config: TokenRingAppConfig, defaultConfig: TokenRingAppConfig = {}) {
     this.config = {...defaultConfig, ...config};
@@ -28,17 +29,16 @@ export default class TokenRingApp {
   getServices = this.services.getItems;
   addServices(...services: TokenRingService[]) {
     this.services.register(...services);
-    services.forEach(service => service.start?.());
+  }
+
+  async startServices() {
+    return Promise.all(this.services.getItems().map(service => service.start?.()));
   }
 
   waitForService = <R extends TokenRingService>(
     serviceType: abstract new (...args: any[]) => R,
-    callback: (service: R) => Promise<void> | void
-  ): void => {
-    this.services.waitForItemByType(serviceType).then(callback).catch((err) => {
-      console.error(err);
-    });
-  }
+    callback: (service: R) => void
+  ): void => this.services.waitForItemByType(serviceType, callback);
 
   /**
    * Log a system message

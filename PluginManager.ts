@@ -19,7 +19,7 @@ export default class PluginManager implements TokenRingService {
   async installPlugins(plugins: TokenRingPlugin[]): Promise<void> {
     for (const plugin of plugins) {
       this.plugins.register(plugin);
-      if (plugin.install) await plugin.install(this.app);
+      if (plugin.install) plugin.install(this.app);
     }
 
     await Promise.all(
