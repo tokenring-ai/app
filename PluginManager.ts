@@ -6,18 +6,24 @@ export default class PluginManager implements TokenRingService {
   name = "PluginManager";
   description = "Manages plugins";
 
+  private app: TokenRingApp;
   private plugins = new TypedRegistry<TokenRingPlugin>();
 
   getPlugins = () => this.plugins.getItems();
 
-  async installPlugins(plugins: TokenRingPlugin[], app: TokenRingApp): Promise<void> {
+  constructor(app: TokenRingApp) {
+    this.app = app;
+    this.app.addServices(this);
+  }
+
+  async installPlugins(plugins: TokenRingPlugin[]): Promise<void> {
     for (const plugin of plugins) {
       this.plugins.register(plugin);
-      if (plugin.install) await plugin.install(app);
+      if (plugin.install) await plugin.install(this.app);
     }
 
     await Promise.all(
-      this.plugins.getItems().map(plugin => plugin.start?.(app))
+      this.plugins.getItems().map(plugin => plugin.start?.(this.app))
     );
   }
 }
