@@ -87,9 +87,9 @@ export default class TokenRingApp {
   /**
    * Get a config value by key and parse it using the provided schema
    */
-  getConfigSlice<T extends { parse: (any: any) => any}>(key: string, schema: T): z.infer<T> {
+  getConfigSlice<T extends { parse: (any: any) => any}>(key: string, schema: T): z.output<T> {
     try {
-      return schema.parse(this.config[key]) as z.infer<T>;
+      return schema.parse(this.config[key]) as z.output<T>;
     } catch (error) {
       throw new Error(
         `Invalid config value for key "${key}": ${(error as Error).message}`,
