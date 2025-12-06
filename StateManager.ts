@@ -137,4 +137,57 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     });
   }
 
+  async * subscribeAsync<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+    signal: AbortSignal,
+  ): AsyncGenerator<T, void, unknown> {
+    // Check if already aborted
+    if (signal.aborted) {
+      return;
+    }
+
+    // Create a queue to buffer state updates
+    const queue: T[] = [];
+    let resolveNext: (() => void) | null = null;
+    let isComplete = false;
+
+    // Set up abort handler
+    const abortHandler = () => {
+      isComplete = true;
+      if (resolveNext) {
+        resolveNext();
+        resolveNext = null;
+      }
+    };
+
+    signal.addEventListener('abort', abortHandler);
+
+    // Subscribe to state changes
+    const unsubscribe = this.subscribe(ClassType, (state) => {
+      queue.push(state);
+      if (resolveNext) {
+        resolveNext();
+        resolveNext = null;
+      }
+    });
+
+    try {
+      while (!isComplete && !signal?.aborted) {
+        // Wait for next item in queue
+        if (queue.length === 0) {
+          await new Promise<void>((resolve) => {
+            resolveNext = resolve;
+          });
+        }
+
+        // Yield all queued items
+        while (queue.length > 0 && !signal?.aborted) {
+          yield queue.shift()!;
+        }
+      }
+    } finally {
+      unsubscribe();
+      signal.removeEventListener('abort', abortHandler);
+    }
+  }
 }
