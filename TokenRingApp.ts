@@ -4,7 +4,7 @@ import type {TokenRingService} from "./types.ts";
 import {z} from "zod";
 
 
-export const TokenRingAppConfigSchema = z.record(z.string(), z.any());
+export const TokenRingAppConfigSchema = z.record(z.string(), z.unknown());
 export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
 
 export type LogEntry = {
@@ -14,11 +14,11 @@ export type LogEntry = {
 };
 
 export default class TokenRingApp {
-  private readonly config: TokenRingAppConfig;
+  readonly config: TokenRingAppConfig;
   readonly logs: LogEntry[] = [];
   started: boolean = false;
   
-  constructor(config: TokenRingAppConfig, defaultConfig: TokenRingAppConfig = {}) {
+  constructor(readonly packageDirectory: string, config: Partial<TokenRingAppConfig>, defaultConfig: TokenRingAppConfig) {
     this.config = {...defaultConfig, ...config};
   }
 
