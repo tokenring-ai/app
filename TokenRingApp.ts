@@ -16,8 +16,9 @@ export type LogEntry = {
 export default class TokenRingApp {
   readonly config: TokenRingAppConfig;
   readonly logs: LogEntry[] = [];
-  started: boolean = false;
-  
+  private readonly abortController = new AbortController();
+
+
   constructor(readonly packageDirectory: string, config: Partial<TokenRingAppConfig>, defaultConfig: TokenRingAppConfig) {
     this.config = {...defaultConfig, ...config};
   }
@@ -31,9 +32,24 @@ export default class TokenRingApp {
     this.services.register(...services);
   }
 
-  async startServices() {
-    return Promise.all(this.services.getItems().map(service => service.start?.()));
+  shutdown() {
+    this.abortController.abort();
   }
+
+  async run() {
+    const signal = this.abortController.signal;
+    await Promise.all([
+      ...this.services.getItems().map(service => {
+        const cancel = service.run?.(signal)
+      }),
+      new Promise(resolve => {
+        signal.addEventListener('abort',resolve);
+      })
+    ]);
+  }
+  /*async startServices() {
+    return Promise.all(this.services.getItems().map(service => service.start?.()));
+  }*/
 
   waitForService = <R extends TokenRingService>(
     serviceType: abstract new (...args: any[]) => R,

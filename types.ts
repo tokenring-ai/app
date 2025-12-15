@@ -14,9 +14,9 @@ export interface TokenRingService {
   name: string; // Must match class name
   description: string;
 
-  start?(): Promise<void> | void;
+  stop?: never;
 
-  stop?(): Promise<void> | void;
+  run?(signal: AbortSignal): Promise<void> | void;
 
   attach?(agent: Agent): Promise<void> | void;
 
