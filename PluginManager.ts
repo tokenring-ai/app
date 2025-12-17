@@ -6,7 +6,7 @@ export default class PluginManager implements TokenRingService {
   name = "PluginManager";
   description = "Manages plugins";
 
-  private app: TokenRingApp;
+  private readonly app: TokenRingApp;
   private plugins = new TypedRegistry<TokenRingPlugin>();
 
   getPlugins = () => this.plugins.getItems();

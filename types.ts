@@ -1,5 +1,4 @@
 import Agent from "@tokenring-ai/agent/Agent";
-import {ContextItem} from "@tokenring-ai/agent/types";
 import TokenRingApp from "./TokenRingApp.ts";
 
 export interface TokenRingPlugin {
