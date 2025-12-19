@@ -74,7 +74,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     }
   }
 
-  entries(): IterableIterator<[string, SerializableStateSlice]> {
+  entries(): IterableIterator<[string, SpecificStateSliceType]> {
     return this.state.entries();
   }
 
