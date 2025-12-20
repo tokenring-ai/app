@@ -39,9 +39,7 @@ export default class TokenRingApp {
   async run() {
     const signal = this.abortController.signal;
     await Promise.all([
-      ...this.services.getItems().map(service => {
-        const cancel = service.run?.(signal)
-      }),
+      ...this.services.getItems().map(service => service.run?.(signal)),
       new Promise(resolve => {
         signal.addEventListener('abort',resolve);
       })

@@ -139,7 +139,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
   async * subscribeAsync<T extends SpecificStateSliceType>(
     ClassType: new (...args: any[]) => T,
-    signal: AbortSignal,
+    signal: AbortSignal
   ): AsyncGenerator<T, void, unknown> {
     // Check if already aborted
     if (signal.aborted) {
@@ -147,7 +147,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     }
 
     // Create a queue to buffer state updates
-    const queue: T[] = [];
+    let latestItem: T | null = this.getState(ClassType);
     let resolveNext: (() => void) | null = null;
     let isComplete = false;
 
@@ -164,7 +164,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
     // Subscribe to state changes
     const unsubscribe = this.subscribe(ClassType, (state) => {
-      queue.push(state);
+      latestItem = state
       if (resolveNext) {
         resolveNext();
         resolveNext = null;
@@ -174,15 +174,17 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     try {
       while (!isComplete && !signal?.aborted) {
         // Wait for next item in queue
-        if (queue.length === 0) {
+        if (latestItem === null) {
           await new Promise<void>((resolve) => {
             resolveNext = resolve;
           });
         }
 
-        // Yield all queued items
-        while (queue.length > 0 && !signal?.aborted) {
-          yield queue.shift()!;
+        // Yield  queued items
+        if (latestItem && !signal?.aborted) {
+          const item = latestItem;
+          latestItem = null;
+          yield item;
         }
       }
     } finally {
