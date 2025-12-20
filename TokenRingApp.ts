@@ -2,7 +2,7 @@ import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import type {TokenRingService} from "./types.ts";
 import {z} from "zod";
-
+import {setTimeout} from "timers/promises";
 
 export const TokenRingAppConfigSchema = z.record(z.string(), z.unknown());
 export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
@@ -47,9 +47,6 @@ export default class TokenRingApp {
       })
     ]);
   }
-  /*async startServices() {
-    return Promise.all(this.services.getItems().map(service => service.start?.()));
-  }*/
 
   waitForService = <R extends TokenRingService>(
     serviceType: abstract new (...args: any[]) => R,
@@ -72,32 +69,22 @@ export default class TokenRingApp {
   /*
    * Track an app-level promise and log any errors that occur.
    */
-  trackPromise(prom: Promise<void>) : void {
-    prom.catch((err) => this.serviceError("[TokenRingApp] Error:", err));
+  trackPromise(initiator: (signal: AbortSignal) => Promise<void>) : void {
+    initiator(this.abortController.signal)
+      .catch((err) => this.serviceError("[TokenRingApp] Error:", err));
   }
 
-  scheduleEvery(interval: number, callback: () => Promise<void>) : () => void {
-    let cancelled = false;
-
-    let timer: NodeJS.Timeout | undefined = undefined;
-
-    const run = async () =>  {
-      if (cancelled) return;
-      try {
-        await callback();
-      } catch (err) {
-        this.serviceError("[TokenRingApp] Error:", err);
-      } finally {
-        if (! cancelled) timer = setTimeout(run, interval);
+  scheduleEvery(interval: number, callback: () => Promise<void>, signal?: AbortSignal) : void {
+    this.trackPromise(async (appSignal) => {
+      while (!signal?.aborted && !appSignal.aborted) {
+        try {
+          await callback();
+        } catch (err) {
+          this.serviceError("[TokenRingApp] Error:", err);
+        }
+        await setTimeout(interval);
       }
-    };
-
-    this.trackPromise(run());
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
+    });
   }
 
   /**
