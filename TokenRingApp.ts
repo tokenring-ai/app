@@ -56,12 +56,12 @@ export default class TokenRingApp {
    */
   serviceOutput(...messages: any[]): void {
     const message = formatLogMessages(messages);
-    this.logs.push({ timestamp: Date.now(), level: "info", message });
+    this.logs.push({ timestamp: Date.now(), level: "info", message: message });
   }
 
   serviceError(...messages: any[]): void {
     const message = formatLogMessages(messages);
-    this.logs.push({ timestamp: Date.now(), level: "error", message });
+    this.logs.push({ timestamp: Date.now(), level: "error", message: message });
   }
 
   /*
