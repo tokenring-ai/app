@@ -1,41 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import TokenRingApp, { TokenRingAppConfig } from './TokenRingApp';
+import TokenRingApp, { TokenRingAppConfig } from '../TokenRingApp';
+import createTestingApp from "./createTestingApp";
 
-// Mock the @tokenring-ai/utility dependencies
-vi.mock('@tokenring-ai/utility/registry/TypedRegistry', () => {
-  return {
-    default: class MockTypedRegistry {
-      register = vi.fn();
-      getItems = vi.fn().mockReturnValue([]);
-      requireItemByType = vi.fn();
-      getItemByType = vi.fn();
-      waitForItemByType = vi.fn();
-      getItemsByType = vi.fn();
-    }
-  };
-});
-
-vi.mock('@tokenring-ai/utility/string/formatLogMessage', () => {
-  return {
-    default: (...messages: any[]) => messages.join(' ')
-  };
-});
-
-// Mock timers/promises
-vi.mock('timers/promises', () => ({
-  setTimeout: vi.fn().mockImplementation((delay) => 
-    new Promise(resolve => setTimeout(resolve, delay))
-  )
-}));
 
 describe('TokenRingApp', () => {
   let app: TokenRingApp;
-  const mockPackageDirectory = '/test/app';
-  const defaultConfig: TokenRingAppConfig = { foo: 'bar' };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    app = new TokenRingApp(mockPackageDirectory, {}, defaultConfig);
+    app = createTestingApp()
   });
 
   afterEach(() => {

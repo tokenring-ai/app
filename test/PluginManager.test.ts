@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import PluginManager from './PluginManager';
-import TokenRingApp from './TokenRingApp';
-import type { TokenRingPlugin, TokenRingService } from './types';
+import PluginManager from '../PluginManager';
+import TokenRingApp from '../TokenRingApp';
+import type { TokenRingPlugin, TokenRingService } from '../types';
+import createTestingApp from "./createTestingApp";
 
 // Mock TokenRingApp to avoid complex dependencies
 vi.mock('./TokenRingApp', () => {
@@ -23,7 +24,7 @@ describe('PluginManager', () => {
     vi.clearAllMocks();
     
     // Create a mock app instance
-    mockApp = new TokenRingApp('/test', {}, {}) as any;
+    mockApp = createTestingApp();
     pluginManager = new PluginManager(mockApp);
   });
 
@@ -38,7 +39,7 @@ describe('PluginManager', () => {
     });
 
     it('should register itself as a service', () => {
-      expect(mockApp.addServices).toHaveBeenCalledWith(pluginManager);
+      expect(mockApp.getServices()).toContain(pluginManager);
     });
 
     it('should initialize plugins registry', () => {

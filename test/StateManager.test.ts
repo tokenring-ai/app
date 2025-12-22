@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import StateManager, { SerializableStateSlice, StateStorageInterface } from './StateManager';
+import StateManager, { SerializableStateSlice } from '../StateManager.ts';
 
 describe('StateManager', () => {
   let stateManager: StateManager<TestStateSlice>;
@@ -379,19 +379,6 @@ describe('StateManager', () => {
       const generator = stateManager.subscribeAsync(MockStateSlice, controller.signal);
       const results: string[] = [];
 
-      // Start async iteration
-      const iteratePromise = (async () => {
-        for await (const state of generator) {
-          results.push(state.data);
-          if (results.length >= 2) {
-            controller.abort();
-          }
-        }
-      })();
-
-      // Wait for initial state to be processed
-      await new Promise(resolve => setTimeout(resolve, 5));
-
       // Trigger state changes
       setTimeout(() => {
         stateManager.mutateState(MockStateSlice, (state) => {
@@ -405,9 +392,14 @@ describe('StateManager', () => {
         });
       }, 30);
 
-      await iteratePromise;
+      for await (const state of generator) {
+        results.push(state.data);
+        if (results.length >= 3) {
+          controller.abort();
+        }
+      }
 
-      expect(results.length).toBeGreaterThanOrEqual(2);
+      expect(results.length).toEqual(3);
       expect(results[0]).toBe('initial');
     }, 3000);
 
