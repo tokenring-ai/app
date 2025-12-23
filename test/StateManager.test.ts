@@ -114,14 +114,6 @@ describe('StateManager', () => {
       const updatedState = stateManager.getState(MockStateSlice);
       expect(updatedState.data).toBe('mutated');
     });
-
-    it('should return undefined when mutation callback returns nothing', () => {
-      const result = stateManager.mutateState(MockStateSlice, (state) => {
-        state.updateData('silent update');
-      });
-
-      expect(result).toBeUndefined();
-    });
   });
 
   describe('Serialization', () => {

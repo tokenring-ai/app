@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import PluginManager from '../PluginManager';
 import TokenRingApp from '../TokenRingApp';
-import type { TokenRingPlugin, TokenRingService } from '../types';
+import type { TokenRingPlugin } from '../types';
 import createTestingApp from "./createTestingApp";
 
 // Mock TokenRingApp to avoid complex dependencies
