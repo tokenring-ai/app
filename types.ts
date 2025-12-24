@@ -13,13 +13,16 @@ export interface TokenRingService {
   name: string; // Must match class name
   description: string;
 
-  stop?: never;
-
   run?(signal: AbortSignal): Promise<void> | void;
 
   attach?(agent: Agent): Promise<void> | void;
 
   detach?(agent: Agent): Promise<void> | void;
 
+
+  // Legacy methods - set to never type to cause tsc to flag the use of these methods
+  install?: never;
+  start?: never;
+  stop?: never;
   getContextItems?: never;
 }

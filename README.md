@@ -9,7 +9,7 @@ The `@tokenring-ai/app` package provides the foundational infrastructure for bui
 ## Installation
 
 ```bash
-npm install @tokenring-ai/app
+bun install @tokenring-ai/app
 ```
 
 ## Core Components
@@ -21,18 +21,22 @@ The main application class that orchestrates services, state, and configuration.
 ```typescript
 import TokenRingApp from "@tokenring-ai/app";
 
-const app = new TokenRingApp(config, defaultConfig);
+const app = new TokenRingApp(packageDirectory: string, config: Partial<TokenRingAppConfig>, defaultConfig: TokenRingAppConfig);
 ```
 
 **Constructor Parameters:**
+- `packageDirectory`: Package directory path
 - `config`: Application configuration object
-- `defaultConfig` (optional): Default configuration that gets merged with provided config
+- `defaultConfig`: Default configuration that gets merged with provided config
 
 **Key Features:**
 - Service registry and dependency injection
 - Plugin lifecycle management
 - Configuration management with Zod validation
 - Built-in logging utilities
+- Promise tracking and error handling
+- Scheduled task management
+- Signal-based shutdown
 
 **API Methods:**
 
@@ -63,7 +67,7 @@ app.waitForService<T>(
 app.getConfigSlice<T extends { parse: (any: any) => any }>(
   key: string, 
   schema: T
-): z.infer<T>
+): z.output<T>
 ```
 
 **Logging:**
@@ -75,6 +79,34 @@ app.serviceOutput(...messages: any[]): void
 app.serviceError(...messages: any[]): void
 ```
 
+**Promise Management:**
+```typescript
+// Track an app-level promise and log any errors that occur
+app.trackPromise(initiator: (signal: AbortSignal) => Promise<void>): void
+```
+
+**Scheduling:**
+```typescript
+// Schedule a recurring task
+app.scheduleEvery(
+  interval: number, 
+  callback: () => Promise<void>, 
+  signal?: AbortSignal
+): void
+```
+
+**Lifecycle:**
+```typescript
+// Stop the application
+app.shutdown(): void
+```
+
+**Execution:**
+```typescript
+// Run the application services
+app.run(): Promise<void>
+```
+
 ### PluginManager
 
 Manages plugin installation and lifecycle.
@@ -82,11 +114,10 @@ Manages plugin installation and lifecycle.
 ```typescript
 import {PluginManager} from "@tokenring-ai/app";
 
-const pluginManager = new PluginManager();
-app.addServices(pluginManager);
+const pluginManager = new PluginManager(app: TokenRingApp);
 
 // Install plugins
-await pluginManager.installPlugins(plugins, app);
+await pluginManager.installPlugins(plugins: TokenRingPlugin[]): Promise<void>
 ```
 
 **Plugin Lifecycle:**
@@ -131,15 +162,11 @@ interface TokenRingService {
   description: string;
   
   // Optional lifecycle methods
-  start?(): Promise<void> | void;
-  stop?(): Promise<void> | void;
+  run?(signal: AbortSignal): Promise<void> | void;
   
   // Agent attachment methods
   attach?(agent: Agent): Promise<void> | void;
   detach?(agent: Agent): Promise<void> | void;
-  
-  // Context item provider
-  getContextItems?(agent: Agent): AsyncGenerator<ContextItem>;
 }
 ```
 
@@ -180,7 +207,7 @@ const config = {
 };
 
 // Create the application instance
-const app = new TokenRingApp(config);
+const app = new TokenRingApp("./", config, defaultConfig);
 
 // Define custom services
 class MyService implements TokenRingService {
@@ -200,9 +227,19 @@ class MyService implements TokenRingService {
 app.addServices(new MyService());
 
 // Install plugins
-const pluginManager = new PluginManager();
-app.addServices(pluginManager);
-await pluginManager.installPlugins([myPlugin], app);
+const pluginManager = new PluginManager(app);
+const myPlugin = {
+  name: "MyPlugin",
+  version: "1.0.0",
+  description: "My custom plugin",
+  install(app) {
+    console.log("Installing plugin");
+  },
+  start(app) {
+    console.log("Starting plugin");
+  }
+};
+await pluginManager.installPlugins([myPlugin]);
 
 // Use services
 const myService = app.requireService(MyService);
@@ -215,6 +252,14 @@ console.log(`Using model: ${modelConfig}`);
 // Logging
 app.serviceOutput("Service started successfully");
 app.serviceError("Something went wrong");
+
+// Schedule a recurring task
+app.scheduleEvery(5000, async () => {
+  console.log("Running scheduled task");
+});
+
+// Run the application
+await app.run();
 ```
 
 ## Configuration Schema
@@ -228,7 +273,9 @@ export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
 
 ## Dependencies
 
-- `@tokenring-ai/utility` ^0.1.0
+- `@tokenring-ai/agent` ^0.2.0
+- `@tokenring-ai/utility` ^0.2.0
+- `zod` ^latest
 
 ## Architecture
 
@@ -240,17 +287,8 @@ The app package follows these design principles:
 - **Lifecycle Management**: Controlled initialization and cleanup
 - **State Isolation**: Separate state slices with serialization
 - **Configuration Validation**: Zod-based configuration validation
-
-## Integration with TokenRing Ecosystem
-
-The `@tokenring-ai/app` package is designed to work seamlessly with other TokenRing packages:
-
-- **@tokenring-ai/agent**: Agent management and execution
-- **@tokenring-ai/ai-client**: AI model integration
-- **@tokenring-ai/chat**: Chat interface
-- **@tokenring-ai/filesystem**: File system operations
-- **@tokenring-ai/database**: Database integration
-- And many more...
+- **Signal-Based**: Abort signals for graceful shutdown
+- **Error Handling**: Built-in promise tracking and error logging
 
 ## License
 
