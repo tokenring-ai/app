@@ -386,12 +386,12 @@ describe('StateManager', () => {
 
       for await (const state of generator) {
         results.push(state.data);
-        if (results.length >= 3) {
+        if (results.length >= 4) {
           controller.abort();
         }
       }
 
-      expect(results.length).toEqual(3);
+      expect(results.length).toEqual(4);
       expect(results[0]).toBe('initial');
     }, 3000);
 
