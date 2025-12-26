@@ -99,10 +99,7 @@ app.scheduleEvery(
 ```typescript
 // Stop the application
 app.shutdown(): void
-```
 
-**Execution:**
-```typescript
 // Run the application services
 app.run(): Promise<void>
 ```
@@ -267,7 +264,7 @@ await app.run();
 The application uses Zod for configuration validation. The base configuration schema is:
 
 ```typescript
-export const TokenRingAppConfigSchema = z.record(z.string(), z.any());
+export const TokenRingAppConfigSchema = z.record(z.string(), z.unknown());
 export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
 ```
 
