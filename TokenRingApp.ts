@@ -1,8 +1,8 @@
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
-import type {TokenRingService} from "./types.ts";
-import {z} from "zod";
 import {setTimeout} from "timers/promises";
+import {z} from "zod";
+import type {TokenRingService} from "./types.ts";
 
 export const TokenRingAppConfigSchema = z.record(z.string(), z.unknown());
 export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
@@ -14,14 +14,10 @@ export type LogEntry = {
 };
 
 export default class TokenRingApp {
-  readonly config: TokenRingAppConfig;
   readonly logs: LogEntry[] = [];
   private readonly abortController = new AbortController();
 
-
-  constructor(readonly packageDirectory: string, config: Partial<TokenRingAppConfig>, defaultConfig: TokenRingAppConfig) {
-    this.config = {...defaultConfig, ...config};
-  }
+  constructor(readonly packageDirectory: string, readonly config: TokenRingAppConfig) {}
 
   services = new TypedRegistry<TokenRingService>();
 
@@ -99,3 +95,4 @@ export default class TokenRingApp {
   }
 
 }
+
