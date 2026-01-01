@@ -1,10 +1,18 @@
 # @tokenring-ai/app
 
-Base application framework for TokenRing applications, providing service management, plugin architecture, and state management.
-
 ## Overview
+Base application framework for TokenRing applications, providing service management, plugin architecture, and state management through a unified interface. The package serves as the foundational infrastructure for building modular, extensible TokenRing applications with comprehensive lifecycle management.
 
-The `@tokenring-ai/app` package provides the foundational infrastructure for building modular, extensible TokenRing applications. It manages services, plugins, and application state through a unified interface.
+## Features
+- **Service-Oriented Architecture**: Organizes functionality into configurable services
+- **Plugin-Based Extensions**: Seamless integration with plugin system for modular functionality
+- **Type-Safe Configuration**: Zod-based validation for all configuration schemas
+- **Lifecycle Management**: Controlled initialization, startup, and shutdown processes
+- **State Isolation**: Separate state slices with serialization support
+- **Signal-Based Shutdown**: Graceful termination using AbortSignal
+- **Promise Tracking**: Automatic error handling for async operations
+- **Scheduled Tasks**: Built-in task scheduling for recurring operations
+- **Comprehensive Logging**: Structured output for system messages and errors
 
 ## Installation
 
@@ -12,201 +20,105 @@ The `@tokenring-ai/app` package provides the foundational infrastructure for bui
 bun install @tokenring-ai/app
 ```
 
-## Core Components
+## Core Components/API
 
 ### TokenRingApp
 
-The main application class that orchestrates services, state, and configuration.
+The main application class that orchestrates services, configuration, and lifecycle management.
 
+#### Constructor
 ```typescript
-import TokenRingApp from "@tokenring-ai/app";
-
-const app = new TokenRingApp(packageDirectory: string, config: Partial<TokenRingAppConfig>, defaultConfig: TokenRingAppConfig);
+new TokenRingApp(
+  packageDirectory: string,
+  config: TokenRingAppConfig
+)
 ```
 
-**Constructor Parameters:**
-- `packageDirectory`: Package directory path
-- `config`: Application configuration object
-- `defaultConfig`: Default configuration that gets merged with provided config
+#### Methods
 
-**Key Features:**
-- Service registry and dependency injection
-- Plugin lifecycle management
-- Configuration management with Zod validation
-- Built-in logging utilities
-- Promise tracking and error handling
-- Scheduled task management
-- Signal-based shutdown
+##### Service Management
+- `addServices(...services: TokenRingService[]): void`
+  - Register services with the application
+  - Services are automatically initialized in registration order
 
-**API Methods:**
+- `requireService<T>(serviceType: abstract new (...args: any[]) => T): T`
+  - Get a service by type (throws error if not found)
 
-**Service Management:**
-```typescript
-// Add services to the application
-app.addServices(...services: TokenRingService[]): void
+- `getService<T>(serviceType: abstract new (...args: any[]) => T): T | undefined`
+  - Get a service by type (returns undefined if not found)
 
-// Get a service by type (throws if not found)
-app.requireService<T>(serviceType: abstract new (...args: any[]) => T): T
+- `getServices(): TokenRingService[]`
+  - Get all registered services
 
-// Get a service by type (returns undefined if not found)
-app.getService<T>(serviceType: abstract new (...args: any[]) => T): T | undefined
+- `waitForService<T>(serviceType: abstract new (...args: any[]) => T, callback: (service: T) => Promise<void> | void): void`
+  - Wait for a service to become available
 
-// Get all services
-app.getServices(): TokenRingService[]
+##### Configuration
+- `getConfigSlice<T extends { parse: (any: any) => any }>(key: string, schema: T): z.output<T>`
+  - Get validated config slice using Zod schema
 
-// Wait for a service to be available
-app.waitForService<T>(
-  serviceType: abstract new (...args: any[]) => T,
-  callback: (service: T) => Promise<void> | void
-): void
-```
+##### Logging
+- `serviceOutput(...messages: any[]): void`
+  - Log system messages with formatted output
 
-**Configuration Management:**
-```typescript
-// Get a config value with Zod validation
-app.getConfigSlice<T extends { parse: (any: any) => any }>(
-  key: string, 
-  schema: T
-): z.output<T>
-```
+- `serviceError(...messages: any[]): void`
+  - Log error messages with formatted output
 
-**Logging:**
-```typescript
-// Log system messages with formatted output
-app.serviceOutput(...messages: any[]): void
+##### Promise Management
+- `trackPromise(initiator: (signal: AbortSignal) => Promise<void>): void`
+  - Track an app-level promise and log any errors
 
-// Log error messages with formatted output
-app.serviceError(...messages: any[]): void
-```
+##### Scheduling
+- `scheduleEvery(interval: number, callback: () => Promise<void>, signal?: AbortSignal): void`
+  - Schedule a recurring task with interval
 
-**Promise Management:**
-```typescript
-// Track an app-level promise and log any errors that occur
-app.trackPromise(initiator: (signal: AbortSignal) => Promise<void>): void
-```
+##### Lifecycle
+- `shutdown(): void`
+  - Stop the application
 
-**Scheduling:**
-```typescript
-// Schedule a recurring task
-app.scheduleEvery(
-  interval: number, 
-  callback: () => Promise<void>, 
-  signal?: AbortSignal
-): void
-```
-
-**Lifecycle:**
-```typescript
-// Stop the application
-app.shutdown(): void
-
-// Run the application services
-app.run(): Promise<void>
-```
+- `run(): Promise<void>`
+  - Start the application services
 
 ### PluginManager
 
 Manages plugin installation and lifecycle.
 
-```typescript
-import {PluginManager} from "@tokenring-ai/app";
+#### Methods
+- `installPlugins(plugins: TokenRingPlugin[]): Promise<void>`
+  - Install plugins with configuration validation
 
-const pluginManager = new PluginManager(app: TokenRingApp);
-
-// Install plugins
-await pluginManager.installPlugins(plugins: TokenRingPlugin[]): Promise<void>
-```
-
-**Plugin Lifecycle:**
-1. **Registration** - Plugin is added to the registry
-2. **Install** - Synchronous setup (optional)
-3. **Start** - Async initialization (optional)
-
-**API Methods:**
-```typescript
-// Get all installed plugins
-pluginManager.getPlugins(): TokenRingPlugin[]
-```
+- `getPlugins(): TokenRingPlugin[]`
+  - Get all installed plugins
 
 ### StateManager
 
 Type-safe state management with serialization support.
 
+#### Methods
+- `initializeState<StateClass, Props>(StateClass: new (props: Props) => StateClass, props: Props): void`
+  - Initialize a state slice
+
+- `getState<StateClass>(StateClass: new (...args: any[]) => StateClass): StateClass`
+  - Get a state slice
+
+- `mutateState<R, StateClass>(StateClass: new (...args: any[]) => StateClass, callback: (state: StateClass) => R): R`
+  - Mutate state with a callback
+
+## Usage Examples
+
+### Basic Application Setup
 ```typescript
-// Initialize a state slice
-app.initializeState<StateClass, Props>(
-  StateClass: new (props: Props) => StateClass,
-  props: Props
-): void
+import TokenRingApp from "@tokenring-ai/app";
 
-// Get a state slice
-app.getState<StateClass>(StateClass: new (...args: any[]) => StateClass): StateClass
-
-// Mutate state with a callback
-app.mutateState<R, StateClass>(
-  StateClass: new (...args: any[]) => StateClass,
-  callback: (state: StateClass) => R
-): R
-```
-
-## Interfaces
-
-### TokenRingService
-
-```typescript
-interface TokenRingService {
-  name: string; // Must match class name
-  description: string;
-  
-  // Optional lifecycle methods
-  run?(signal: AbortSignal): Promise<void> | void;
-  
-  // Agent attachment methods
-  attach?(agent: Agent): Promise<void> | void;
-  detach?(agent: Agent): Promise<void> | void;
-}
-```
-
-### TokenRingPlugin
-
-```typescript
-interface TokenRingPlugin {
-  name: string;
-  version: string;
-  description: string;
-  
-  // Optional lifecycle methods
-  install?(app: TokenRingApp): void; // Synchronous setup
-  start?(app: TokenRingApp): Promise<void> | void; // Async initialization
-}
-```
-
-### SerializableStateSlice
-
-```typescript
-interface SerializableStateSlice {
-  name: string;
-  serialize(): object;
-  deserialize(data: object): void;
-}
-```
-
-## Usage Example
-
-```typescript
-import TokenRingApp, {PluginManager} from "@tokenring-ai/app";
-
-// Define your application configuration
-const config = {
+const app = new TokenRingApp("./", {
   apiKey: process.env.API_KEY,
-  model: "gpt-4",
-  // ... other config
-};
+  model: "gpt-4"
+});
+```
 
-// Create the application instance
-const app = new TokenRingApp("./", config, defaultConfig);
-
-// Define custom services
+### Service Management
+```typescript
+// Define custom service
 class MyService implements TokenRingService {
   name = "MyService";
   description = "A custom service";
@@ -220,72 +132,184 @@ class MyService implements TokenRingService {
   }
 }
 
-// Add services to the application
+// Add service to application
 app.addServices(new MyService());
 
-// Install plugins
-const pluginManager = new PluginManager(app);
-const myPlugin = {
-  name: "MyPlugin",
-  version: "1.0.0",
-  description: "My custom plugin",
-  install(app) {
-    console.log("Installing plugin");
-  },
-  start(app) {
-    console.log("Starting plugin");
-  }
-};
-await pluginManager.installPlugins([myPlugin]);
-
-// Use services
+// Get service by type
 const myService = app.requireService(MyService);
-const result = await myService.doSomething();
+```
 
-// Access configuration
-const modelConfig = app.getConfigSlice("model", z.string());
-console.log(`Using model: ${modelConfig}`);
+### Configuration Validation
+```typescript
+const apiKey = app.getConfigSlice("apiKey", z.string().min(1));
+const model = app.getConfigSlice("model", z.string().default("gpt-3.5-turbo"));
+console.log(`Using model: ${model}`);
+```
 
-// Logging
-app.serviceOutput("Service started successfully");
-app.serviceError("Something went wrong");
+### State Management
+```typescript
+// Define state class
+class UserState implements AgentStateSlice {
+  name = "UserState";
+  name: string;
+  
+  constructor(name: string) {
+    this.name = name;
+  }
+  
+  serialize() { return { name: this.name }; }
+  deserialize(data: any) { this.name = data.name; }
+  show() { return [`User: ${this.name}`]; }
+  reset(what: ResetWhat[]) { /* reset logic */ }
+}
 
-// Schedule a recurring task
+// Initialize state
+const stateManager = new StateManager();
+stateManager.initializeState(UserState, new UserState("John"));
+
+// Update state
+stateManager.mutateState(UserState, (state) => {
+  state.name = "Jane";
+});
+```
+
+### Scheduled Tasks
+```typescript
+// Schedule a task that runs every 5 seconds
 app.scheduleEvery(5000, async () => {
   console.log("Running scheduled task");
 });
-
-// Run the application
-await app.run();
 ```
 
-## Configuration Schema
+## Configuration
 
-The application uses Zod for configuration validation. The base configuration schema is:
+### Application Configuration Schema
 
 ```typescript
 export const TokenRingAppConfigSchema = z.record(z.string(), z.unknown());
 export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
 ```
 
+### Plugin Configuration
+
+Plugins can define their own configuration schemas:
+
+```typescript
+const MyPluginConfigSchema = z.object({
+  apiKey: z.string(),
+  model: z.string().default('gpt-3.5-turbo')
+});
+
+const myPlugin = {
+  name: "MyPlugin",
+  version: "1.0.0",
+  description: "My custom plugin with config",
+  config: MyPluginConfigSchema,
+  install(app, config) {
+    console.log(`Installing with API key: ${config.apiKey}`);
+  },
+  start(app, config) {
+    console.log(`Starting with model: ${config.model}`);
+  }
+};
+```
+
+## API Reference
+
+### TokenRingApp
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `addServices(...services: TokenRingService[])` | Register services with application | Array of services | void |
+| `requireService<T>(serviceType: abstract new (...args: any[]) => T)` | Get service by type (throws if not found) | Service type | T |
+| `getService<T>(serviceType: abstract new (...args: any[]) => T)` | Get service by type (returns undefined if not found) | Service type | T &#124; undefined |
+| `waitForService<T>(serviceType, callback)` | Wait for service to be available | Service type, callback function | void |
+| `getConfigSlice<T>(key, schema)` | Get validated config slice | Config key, Zod schema | Zod output type |
+| `serviceOutput(...messages)` | Log system messages | Messages | void |
+| `serviceError(...messages)` | Log error messages | Messages | void |
+| `trackPromise(initiator)` | Track promise and log errors | Promise initiator function | void |
+| `scheduleEvery(interval, callback, signal)` | Schedule recurring task | Interval (ms), callback, AbortSignal | void |
+| `shutdown()` | Stop the application | None | void |
+| `run()` | Start application services | None | Promise<void> |
+
+### PluginManager
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `installPlugins(plugins)` | Install plugins with validation | Array of plugins | Promise<void> |
+| `getPlugins()` | Get all installed plugins | None | TokenRingPlugin[] |
+
+### StateManager
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `initializeState<StateClass, Props>(StateClass, props)` | Initialize state slice | State class, props | void |
+| `getState<StateClass>(StateClass)` | Get state slice | State class | StateClass |
+| `mutateState<R, StateClass>(StateClass, callback)` | Mutate state with callback | State class, callback function | R |
+
+## Error Handling
+
+The application provides comprehensive error handling:
+
+- **Configuration Errors**: Zod validation errors with descriptive messages
+- **Service Not Found**: Clear error when requiring a service that doesn't exist
+- **Promise Errors**: Automatic logging of unhandled promise rejections
+- **Lifecycle Errors**: Graceful shutdown handling during startup failures
+- **State Errors**: Safe deserialization with validation
+
+## Integration
+
+The app package integrates with other TokenRing components:
+
+### Plugin Integration
+
+```typescript
+// Register plugins with configuration
+app.registerPlugin(myPlugin);
+```
+
+### Agent Integration
+
+```typescript
+// Access app services from agent
+const appService = agent.requireServiceByType(TokenRingApp);
+```
+
+### Chat Service Integration
+
+```typescript
+// Use app services in chat commands
+const model = app.getConfigSlice("model", z.string());
+```
+
+## Development
+
+### Testing
+
+```bash
+bun test
+bun test:coverage
+```
+
+### Building
+
+```bash
+bun run build
+```
+
+### Contribution Guidelines
+
+- Follow established coding patterns
+- Write unit tests for new functionality
+- Ensure Zod schema validation for all configuration
+- Update documentation for new features
+- Test with multiple service configurations
+
 ## Dependencies
 
 - `@tokenring-ai/agent` ^0.2.0
 - `@tokenring-ai/utility` ^0.2.0
 - `zod` ^latest
-
-## Architecture
-
-The app package follows these design principles:
-
-- **Service-Oriented**: Functionality is organized into services
-- **Plugin-Based**: Extensions through a plugin system
-- **Type-Safe**: TypeScript with generic type support
-- **Lifecycle Management**: Controlled initialization and cleanup
-- **State Isolation**: Separate state slices with serialization
-- **Configuration Validation**: Zod-based configuration validation
-- **Signal-Based**: Abort signals for graceful shutdown
-- **Error Handling**: Built-in promise tracking and error logging
 
 ## License
 
