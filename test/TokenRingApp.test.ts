@@ -15,28 +15,6 @@ describe('TokenRingApp', () => {
     app.shutdown();
   });
 
-  describe('Constructor and Configuration', () => {
-    it('should initialize with correct configuration', () => {
-      const config = { test: 'value' };
-      const customDefaultConfig: TokenRingAppConfig = { default: 'config' };
-      const appWithConfig = new TokenRingApp('/test', config, customDefaultConfig);
-      
-      expect(appWithConfig.config).toEqual({ default: 'config', test: 'value' });
-    });
-
-    it('should merge config with defaultConfig', () => {
-      const config = { key1: 'value1', key2: 'value2' };
-      const customDefault: TokenRingAppConfig = { key2: 'overridden', key3: 'value3' };
-      const appWithConfig = new TokenRingApp('/test', config, customDefault);
-      
-      expect(appWithConfig.config).toEqual({
-        key1: 'value1',
-        key2: 'value2', // config overrides default
-        key3: 'value3'
-      });
-    });
-  });
-
   describe('Service Registry', () => {
     it('should add services to registry', () => {
       const mockService = {

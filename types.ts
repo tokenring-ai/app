@@ -23,9 +23,9 @@ export interface TokenRingService {
 
   run?(signal: AbortSignal): Promise<void> | void;
 
-  attach?(agent: Agent): Promise<void> | void;
+  attach?(agent: Agent): void;
 
-  detach?(agent: Agent): Promise<void> | void;
+  detach?(agent: Agent): void;
 
   // Legacy methods - set to never type to cause tsc to flag the use of these methods
   install?: never;

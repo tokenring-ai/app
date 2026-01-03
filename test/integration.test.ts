@@ -325,13 +325,12 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle configuration across components', () => {
-      const config = { database: { url: 'test://url' } };
-      const defaultConfig = { database: { url: 'default://url' }, logging: { level: 'info' } };
+      const config = { database: { url: 'default://url' }, logging: { level: 'info' } };
 
-      const appWithConfig = new TokenRingApp('/test/app', config, defaultConfig);
+      const appWithConfig = new TokenRingApp('/test/app', config);
 
       expect(appWithConfig.config).toEqual({
-        database: { url: 'test://url' },
+        database: { url: 'default://url' },
         logging: { level: 'info' }
       });
 
@@ -344,7 +343,7 @@ describe('App Integration Tests', () => {
         description: 'Config test plugin',
         install: (app) => {
           expect(app.config).toEqual({
-            database: { url: 'test://url' },
+            database: { url: 'default://url' },
             logging: { level: 'info' }
           });
         }
@@ -502,39 +501,6 @@ describe('App Integration Tests', () => {
 
       expect(component2Callback).toHaveBeenCalled();
       expect(stateManager.getState(SharedState).value).toBe('updated');
-    });
-
-    it('should handle configuration propagation', () => {
-      const config = { feature: { enabled: true } };
-      const defaultConfig = { feature: { enabled: false }, other: { value: 'default' } };
-
-      const app1 = new TokenRingApp('/app1', config, defaultConfig);
-      const app2 = new TokenRingApp('/app2', {}, defaultConfig);
-
-      expect(app1.config).toEqual({
-        feature: { enabled: true },
-        other: { value: 'default' }
-      });
-
-      expect(app2.config).toEqual({
-        feature: { enabled: false },
-        other: { value: 'default' }
-      });
-
-      // Plugin manager should work with different app configs
-      const pm1 = new PluginManager(app1);
-      const pm2 = new PluginManager(app2);
-
-      const testPlugin: TokenRingPlugin = {
-        name: 'ConfigPlugin',
-        version: '1.0.0',
-        description: 'Config test plugin',
-        install: (app) => {
-          expect(app.config).toBe(app.config); // Should match the app's config
-        }
-      };
-
-      return pm1.installPlugins([testPlugin]);
     });
   });
 });

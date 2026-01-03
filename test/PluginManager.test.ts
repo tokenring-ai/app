@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {z} from "zod";
 import PluginManager from '../PluginManager';
 import TokenRingApp from '../TokenRingApp';
 import type { TokenRingPlugin } from '../types';
@@ -59,14 +60,15 @@ describe('PluginManager', () => {
         version: '1.0.0',
         description: 'A test plugin',
         install: vi.fn(),
-        start: vi.fn().mockResolvedValue(undefined)
+        start: vi.fn().mockResolvedValue(undefined),
+        configSchema: z.object({})
       };
 
       await pluginManager.installPlugins([mockPlugin]);
 
       expect(pluginManager.getPlugins()).toContain(mockPlugin);
-      expect(mockPlugin.install).toHaveBeenCalledWith(mockApp);
-      expect(mockPlugin.start).toHaveBeenCalledWith(mockApp);
+      expect(mockPlugin.install).toHaveBeenCalledWith(mockApp,{});
+      expect(mockPlugin.start).toHaveBeenCalledWith(mockApp,{});
     });
 
     it('should install multiple plugins', async () => {
@@ -106,7 +108,7 @@ describe('PluginManager', () => {
       await pluginManager.installPlugins([plugin]);
 
       expect(pluginManager.getPlugins()).toContain(plugin);
-      expect(plugin.start).toHaveBeenCalledWith(mockApp);
+      expect(plugin.start).toHaveBeenCalledWith(mockApp,{});
     });
 
     it('should handle plugins without optional start method', async () => {
@@ -121,7 +123,7 @@ describe('PluginManager', () => {
       await pluginManager.installPlugins([plugin]);
 
       expect(pluginManager.getPlugins()).toContain(plugin);
-      expect(plugin.install).toHaveBeenCalledWith(mockApp);
+      expect(plugin.install).toHaveBeenCalledWith(mockApp,{});
     });
 
     it('should handle plugins with neither install nor start methods', async () => {
