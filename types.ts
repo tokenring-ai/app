@@ -6,14 +6,14 @@ export type TokenRingPlugin<ConfigType> = {
   name: string;
   version: string;
   description: string;
-  install?: (app: TokenRingApp) => void; // Install does not allow awaiting, anything awaited must be done in start
+  install?: (app: TokenRingApp) => void | undefined; // Install does not allow awaiting, anything awaited must be done in start
   start?: (app: TokenRingApp) => Promise<void> | void;
 } | {
   name: string;
   version: string;
   description: string;
   config: ConfigType;
-  install?: (app: TokenRingApp, config: z.output<ConfigType>) => void; // Install does not allow awaiting, anything awaited must be done in start
+  install?: (app: TokenRingApp, config: z.output<ConfigType>) => void | undefined; // Install does not allow awaiting, anything awaited must be done in start
   start?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
   reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
 };

@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import TokenRingApp from '../TokenRingApp';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import PluginManager from '../PluginManager';
 import StateManager from '../StateManager';
-import type { TokenRingPlugin, TokenRingService } from '../types';
-
+import TokenRingApp from '../TokenRingApp';
+import type {TokenRingPlugin, TokenRingService} from '../types';
 
 describe('App Integration Tests', () => {
   let app: TokenRingApp;

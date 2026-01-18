@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import TokenRingApp, { TokenRingAppConfig } from '../TokenRingApp';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import TokenRingApp from '../TokenRingApp';
 import createTestingApp from "./createTestingApp";
-
 
 describe('TokenRingApp', () => {
   let app: TokenRingApp;
