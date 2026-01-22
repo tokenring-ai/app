@@ -1,10 +1,13 @@
-export interface SerializableStateSlice {
+import {z} from "zod";
+
+export interface SerializableStateSlice<SerializationSchema> {
   name: string;
-  serialize: () => object;
-  deserialize: (data: object) => void;
+  serialize: () => z.input<SerializationSchema>;
+  deserialize: (data: z.output<SerializationSchema>) => void;
+  serializationSchema: SerializationSchema;
 }
 
-export interface StateStorageInterface<SpecificStateSliceType extends SerializableStateSlice> {
+export interface StateStorageInterface<SpecificStateSliceType extends SerializableStateSlice<any>> {
   getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T;
 
   mutateState<R, T extends SpecificStateSliceType>(
@@ -18,7 +21,7 @@ export interface StateStorageInterface<SpecificStateSliceType extends Serializab
   ): void;
 }
 
-export default class StateManager<SpecificStateSliceType extends SerializableStateSlice> implements StateStorageInterface<SpecificStateSliceType> {
+export default class StateManager<SpecificStateSliceType extends SerializableStateSlice<any>> implements StateStorageInterface<SpecificStateSliceType> {
   state = new Map<string, SpecificStateSliceType>();
   private subscribers = new Map<string, Set<(state: any) => void>>();
 
@@ -67,7 +70,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     for (const key in data) {
       const slice = this.state.get(key);
       if (slice) {
-        slice.deserialize(data[key]);
+        slice.deserialize(slice.serializationSchema.parse(data[key]));
       } else {
         onMissing?.(key);
       }
