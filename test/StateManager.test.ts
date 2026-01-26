@@ -358,6 +358,7 @@ describe('StateManager', () => {
       const generator = stateManager.subscribeAsync(MockStateSlice, controller.signal);
       const results: any[] = [];
 
+      // noinspection LoopStatementThatDoesntLoopJS
       for await (const state of generator) {
         results.push(state.data);
         break;
@@ -401,6 +402,7 @@ describe('StateManager', () => {
       
       // Start async iteration
       const iteratePromise = (async () => {
+        // noinspection LoopStatementThatDoesntLoopJS
         for await (const state of generator) {
           break; // Exit immediately
         }

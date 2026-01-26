@@ -238,22 +238,16 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle service dependencies and order', async () => {
-      const startupOrder: string[] = [];
-
       const serviceA: TokenRingService = {
         name: 'ServiceA',
         description: 'Service A',
-        run: vi.fn().mockImplementation(async () => {
-          startupOrder.push('ServiceA');
-        })
+        run: vi.fn().mockImplementation(async () => {})
       };
 
       const serviceB: TokenRingService = {
         name: 'ServiceB',
         description: 'Service B',
-        run: vi.fn().mockImplementation(async () => {
-          startupOrder.push('ServiceB');
-        })
+        run: vi.fn().mockImplementation(async () => {})
       };
 
       app.addServices(serviceA, serviceB);
