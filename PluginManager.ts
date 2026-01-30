@@ -8,13 +8,11 @@ export default class PluginManager implements TokenRingService {
   name = "PluginManager";
   description = "Manages plugins";
 
-  private readonly app: TokenRingApp;
   private plugins = new TypedRegistry<TokenRingPlugin<ZodObject>>();
 
   getPlugins = () => this.plugins.getItems();
 
-  constructor(app: TokenRingApp) {
-    this.app = app;
+  constructor(private readonly app: TokenRingApp) {
     this.app.addServices(this);
   }
 

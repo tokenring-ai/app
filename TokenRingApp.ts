@@ -35,10 +35,29 @@ export default class TokenRingApp {
   async run() {
     const signal = this.abortController.signal;
     await Promise.all([
-      ...this.services.getItems().map(service => service.run?.(signal)),
-      new Promise(resolve => {
-        signal.addEventListener('abort',resolve);
-      })
+      ...this.services.getItems().map(async (service) => {
+        if (!service.run) return;
+
+        while (!signal.aborted) {
+          try {
+            await service.run(signal);
+            // If run() completes without error but we aren't aborted, it exited "normally"
+            if (!signal.aborted) {
+              this.serviceError(`Service ${service.constructor.name} exited unexpectedly. Restarting in 5s...`);
+            }
+          } catch (err) {
+            if (!signal.aborted) {
+              this.serviceError(`Service ${service.constructor.name} died with error:`, err, "Restarting in 5s...");
+            }
+          }
+
+          if (signal.aborted) break;
+          await setTimeout(5000, {signal});
+        }
+      }),
+      new Promise((resolve) => {
+        signal.addEventListener("abort", resolve);
+      }),
     ]);
   }
 
@@ -95,4 +114,3 @@ export default class TokenRingApp {
   }
 
 }
-
