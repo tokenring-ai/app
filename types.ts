@@ -20,16 +20,7 @@ export type TokenRingPlugin<ConfigType> = {
 export interface TokenRingService {
   name: string; // Must match class name
   description: string;
-
   run?(signal: AbortSignal): Promise<void> | void;
-
   attach?(agent: Agent): void;
-
   detach?(agent: Agent): void;
-
-  // Legacy methods - set to never type to cause tsc to flag the use of these methods
-  install?: never;
-  start?: never;
-  stop?: never;
-  getContextItems?: never;
 }
