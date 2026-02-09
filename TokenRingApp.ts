@@ -28,8 +28,8 @@ export default class TokenRingApp {
     this.services.register(...services);
   }
 
-  shutdown() {
-    this.abortController.abort();
+  shutdown(reason: string = "App shutdown for unknown reason") {
+    this.abortController.abort(reason);
   }
 
   async run() {
@@ -58,11 +58,8 @@ export default class TokenRingApp {
           }
 
           if (signal.aborted) break;
-          await setTimeout(5000, {signal});
+          await setTimeout(5000, null, {signal}).catch(err => null);
         }
-      }),
-      new Promise((resolve) => {
-        signal.addEventListener("abort", resolve);
       }),
     ]);
 
@@ -97,19 +94,6 @@ export default class TokenRingApp {
   trackPromise(initiator: (signal: AbortSignal) => Promise<void>) : void {
     initiator(this.abortController.signal)
       .catch((err) => this.serviceError("[TokenRingApp] Error:", err));
-  }
-
-  scheduleEvery(interval: number, callback: () => Promise<void>, signal?: AbortSignal) : void {
-    this.trackPromise(async (appSignal) => {
-      while (!signal?.aborted && !appSignal.aborted) {
-        try {
-          await callback();
-        } catch (err) {
-          this.serviceError("[TokenRingApp] Error:", err);
-        }
-        await setTimeout(interval);
-      }
-    });
   }
 
   /**

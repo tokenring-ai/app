@@ -1,28 +1,34 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import StateManager, {SerializableStateSlice} from '../StateManager.ts';
+import z from "zod";
+
+const serializationSchema = z.object({
+  data: z.string(),
+});
 
 describe('StateManager', () => {
   let stateManager: StateManager<TestStateSlice>;
 
-  interface TestStateSlice extends SerializableStateSlice {
+  interface TestStateSlice extends SerializableStateSlice<typeof serializationSchema> {
     data: string;
     updateData(newData: string): void;
   }
 
   class MockStateSlice implements TestStateSlice {
     readonly name = 'MockStateSlice';
+    serializationSchema = serializationSchema;
     data: string;
 
     constructor(props: { initialData: string }) {
       this.data = props.initialData;
     }
 
-    serialize(): object {
+    serialize(): z.input<typeof serializationSchema> {
       return { data: this.data };
     }
 
-    deserialize(data: object): void {
-      this.data = (data as any).data;
+    deserialize(data: z.output<typeof serializationSchema>): void {
+      this.data = data.data;
     }
 
     updateData(newData: string): void {
@@ -32,18 +38,19 @@ describe('StateManager', () => {
 
   class AnotherStateSlice implements TestStateSlice {
     readonly name = 'AnotherStateSlice';
+    serializationSchema = serializationSchema;
     data: string;
 
     constructor(props: { initialData: string }) {
       this.data = props.initialData;
     }
 
-    serialize(): object {
+    serialize(): z.input<typeof serializationSchema> {
       return { data: this.data };
     }
 
-    deserialize(data: object): void {
-      this.data = (data as any).data;
+    deserialize(data: z.output<typeof serializationSchema>): void {
+      this.data = data.data;
     }
 
     updateData(newData: string): void {

@@ -3,6 +3,7 @@ import PluginManager from '../PluginManager';
 import StateManager from '../StateManager';
 import TokenRingApp from '../TokenRingApp';
 import type {TokenRingPlugin, TokenRingService} from '../types';
+import { setTimeout} from "timers/promises";
 
 describe('App Integration Tests', () => {
   let app: TokenRingApp;
@@ -166,7 +167,7 @@ describe('App Integration Tests', () => {
       const callback = vi.fn();
       const unsubscribe = stateManager.subscribe(TestStateSlice, callback);
 
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await setTimeout(20);
 
       // Initial call should happen
       expect(callback).toHaveBeenCalledWith(stateManager.getState(TestStateSlice));
@@ -220,7 +221,7 @@ describe('App Integration Tests', () => {
       const runPromise = app.run();
 
       // Wait for services to initialize
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await setTimeout(20);
 
       // Shutdown
       app.shutdown();
@@ -254,7 +255,7 @@ describe('App Integration Tests', () => {
 
       const runPromise = app.run();
 
-      await new Promise(resolve => setTimeout(resolve, 30));
+      await setTimeout(30);
       app.shutdown();
 
       await runPromise;
@@ -307,7 +308,7 @@ describe('App Integration Tests', () => {
       // Start app
       const runPromise = app.run();
 
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await setTimeout(20);
 
       // State should persist
       expect(stateManager.getState(AppState).initialized).toBe(true);
@@ -346,20 +347,24 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle errors gracefully across components', async () => {
-      const errorService: TokenRingService = {
-        name: 'ErrorService',
-        description: 'Service that throws errors',
-        run: vi.fn().mockImplementation(async () => {
+      class Service1 implements TokenRingService {
+        readonly name = 'Service1';
+        description = 'Service 1';
+        async run() {
           throw new Error('Service error');
-        })
-      };
-
-      app.addServices(errorService);
-      try {
-        await app.run();
-      } catch (error) {
-        expect(error).toBeDefined();
+        }
       }
+
+      const errorService = new Service1();
+
+      vi.spyOn(errorService, 'run');
+      app.addServices(errorService);
+      await Promise.all([
+        app.run(),
+        await setTimeout(100).then(() => app.shutdown())
+      ]);
+
+      expect(errorService.run).toHaveBeenCalled();
     });
 
     it('should handle plugin installation errors without breaking app', async () => {
@@ -449,7 +454,7 @@ describe('App Integration Tests', () => {
         expect(service.name).toBe("Service2");
       });
 
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await setTimeout(200);
 
       expect(callbackCalled).toBe(true);
     });

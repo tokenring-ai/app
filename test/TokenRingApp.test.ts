@@ -1,6 +1,8 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import TokenRingApp from '../TokenRingApp';
+import type {TokenRingService} from "../types";
 import createTestingApp from "./createTestingApp";
+import { setTimeout } from 'timers/promises';
 
 describe('TokenRingApp', () => {
   let app: TokenRingApp;
@@ -76,37 +78,11 @@ describe('TokenRingApp', () => {
       app.trackPromise(mockPromise);
       
       // Wait for the promise to resolve (trackPromise doesn't await)
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await setTimeout(10);
       
       expect(app.logs).toHaveLength(1);
       expect(app.logs[0].level).toBe('error');
       expect(app.logs[0].message).toContain('Test error');
-    });
-  });
-
-  describe('Scheduling', () => {
-    it('should schedule recurring tasks', async () => {
-      const mockCallback = vi.fn().mockResolvedValue(undefined);
-      const mockAppSignal = { aborted: false };
-      
-      app.scheduleEvery(100, mockCallback, mockAppSignal);
-      
-      // Check that the promise was tracked
-      expect(app.logs.length).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should handle scheduling errors gracefully', async () => {
-      const mockCallback = vi.fn().mockRejectedValue(new Error('Callback error'));
-      const mockAppSignal = { aborted: false };
-      
-      app.scheduleEvery(100, mockCallback, mockAppSignal);
-      
-      // Wait for at least one execution
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      expect(app.logs).toHaveLength(2);
-      expect(app.logs[0].level).toBe('error');
-      expect(app.logs[0].message).toContain('Callback error');
     });
   });
 
@@ -162,32 +138,33 @@ describe('TokenRingApp', () => {
 
   describe('Run Method', () => {
     it('should run services and handle shutdown', async () => {
-      const mockService1 = {
-        name: 'Service1',
-        run: vi.fn().mockResolvedValue(undefined)
-      };
+      class MockService1 implements TokenRingService {
+        name = "MockService1";
+        description = "Mock service for testing"
+        async run(signal: AbortSignal) {
+          await setTimeout(10000, null, { signal })
+        }
+      }
+
+      class MockService2 implements TokenRingService {
+        name = "MockService2";
+        description = "Mock service for testing"
+        async run() {}
+
+      }
+
+      const mockService1 = new MockService1();
+      const mockService2 = new MockService2();
+      vi.spyOn(mockService1, 'run');
+      vi.spyOn(mockService2, 'run');
+
+      app.addServices(mockService1, mockService2)
       
-      const mockService2 = {
-        name: 'Service2',
-        run: vi.fn().mockResolvedValue(undefined)
-      };
-      
-      // Mock services.getItems to return our test services
-      const mockGetItems = vi.fn().mockReturnValue([mockService1, mockService2]);
-      Object.defineProperty(app, 'services', {
-        get: () => ({
-          getItems: mockGetItems
-        })
-      });
-      
-      const runPromise = app.run();
-      
-      // Wait a bit for services to start
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
-      app.shutdown();
-      await runPromise;
-      
+      await Promise.all([
+        app.run(),
+        setTimeout(100).then(() => app.shutdown())
+      ]);
+
       expect(mockService1.run).toHaveBeenCalled();
       expect(mockService2.run).toHaveBeenCalled();
     });
