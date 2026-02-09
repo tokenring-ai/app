@@ -1,7 +1,7 @@
 import {z} from "zod";
 
 export interface SerializableStateSlice<SerializationSchema> {
-  name: string;
+  readonly name: string;
   serialize: () => z.input<SerializationSchema>;
   deserialize: (data: z.output<SerializationSchema>) => void;
   serializationSchema: SerializationSchema;

@@ -111,7 +111,7 @@ describe('App Integration Tests', () => {
 
     it('should handle state serialization in app context', () => {
       class TestStateSlice {
-        name = 'TestStateSlice';
+        readonly name = 'TestStateSlice';
         data: string;
 
         constructor(props: { initialData: string }) {
@@ -145,7 +145,7 @@ describe('App Integration Tests', () => {
 
     it('should handle state subscriptions in app context', async () => {
       class TestStateSlice {
-        name = 'TestStateSlice';
+        readonly name = 'TestStateSlice';
         counter: number = 0;
 
         serialize() {
@@ -267,7 +267,7 @@ describe('App Integration Tests', () => {
       const stateManager = new StateManager();
 
       class AppState {
-        name = 'AppState';
+        readonly name = 'AppState';
         initialized: boolean = false;
         data: any[] = [];
 
@@ -433,11 +433,11 @@ describe('App Integration Tests', () => {
   describe('Cross-Component Dependencies', () => {
     it('should handle service waiting across components', async () => {
       class Service1 implements TokenRingService {
-        name = 'Service1';
+        readonly name = 'Service1';
         description = 'Service 1';
       }
       class Service2 implements TokenRingService{
-        name = 'Service2';
+        readonly name = 'Service2';
         description = 'Service 2';
       }
 
@@ -458,7 +458,7 @@ describe('App Integration Tests', () => {
       const stateManager = new StateManager();
 
       class SharedState {
-        name = 'SharedState';
+        readonly name = 'SharedState';
         value: string = '';
 
         serialize() {

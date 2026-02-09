@@ -141,7 +141,7 @@ describe('TokenRingApp', () => {
   describe('Service Waiting', () => {
     it('should wait for service', () => {
       class MockService {
-        name = 'MockService'
+        readonly name = 'MockService'
       }
       const mockCallback = vi.fn();
       

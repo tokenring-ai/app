@@ -35,19 +35,19 @@ The main application class that orchestrates services, configuration, and lifecy
 constructor(readonly packageDirectory: string, readonly config: TokenRingAppConfig)
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| packageDirectory | string | Path to the application directory |
-| config | TokenRingAppConfig | Application configuration as key-value pairs |
+| Parameter        | Type               | Description                                  |
+|------------------|--------------------|----------------------------------------------|
+| packageDirectory | string             | Path to the application directory            |
+| config           | TokenRingAppConfig | Application configuration as key-value pairs |
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| config | TokenRingAppConfig | The application configuration |
-| packageDirectory | string | Path to the application directory |
-| logs | LogEntry[] | Array of logged system messages |
-| services | TypedRegistry<TokenRingService> | Registry of all registered services |
+| Property         | Type                            | Description                         |
+|------------------|---------------------------------|-------------------------------------|
+| config           | TokenRingAppConfig              | The application configuration       |
+| packageDirectory | string                          | Path to the application directory   |
+| logs             | LogEntry[]                      | Array of logged system messages     |
+| services         | TypedRegistry<TokenRingService> | Registry of all registered services |
 
 #### Methods
 
@@ -263,14 +263,14 @@ async function buildTokenRingAppConfig<ConfigSchema extends ZodObject>({
 
 Build application configuration by loading from multiple locations with Zod validation.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| workingDirectory | string | Path to source/working directory |
-| dataDirectory | string | Path to data directory |
-| configFileName | string | Base name of config files (without extension) |
-| configSchema | ConfigSchema | Zod schema for validation |
-| defaultConfig | z.input<ConfigSchema> | Default configuration |
-| mergeConfig | function | Optional config merge function (default: deepMerge) |
+| Parameter        | Type                  | Description                                         |
+|------------------|-----------------------|-----------------------------------------------------|
+| workingDirectory | string                | Path to source/working directory                    |
+| dataDirectory    | string                | Path to data directory                              |
+| configFileName   | string                | Base name of config files (without extension)       |
+| configSchema     | ConfigSchema          | Zod schema for validation                           |
+| defaultConfig    | z.input<ConfigSchema> | Default configuration                               |
+| mergeConfig      | function              | Optional config merge function (default: deepMerge) |
 
 **Config Loading Order:** Config files are loaded from `~` (home) and `dataDirectory` in that order, with extensions `.ts`, `.mjs`, `.cjs`, `.js`.
 
@@ -607,55 +607,55 @@ const myPlugin: TokenRingPlugin<typeof MyPluginSchema> = {
 
 ### TokenRingApp
 
-| Method | Description |
-|--------|-------------|
-| `addServices(...services)` | Register services with application |
-| `requireService(serviceType)` | Get service by type (throws if not found) |
-| `getService(serviceType)` | Get service by type (returns undefined if not found) |
-| `getServices()` | Get all registered services |
-| `waitForService(serviceType, callback)` | Wait for service to be available |
-| `getConfigSlice(key, schema)` | Get validated config slice |
-| `serviceOutput(...messages)` | Log system messages |
-| `serviceError(...messages)` | Log error messages |
-| `trackPromise(initiator)` | Track promise and log errors |
-| `scheduleEvery(interval, callback, signal)` | Schedule recurring task |
-| `shutdown()` | Stop the application |
-| `run()` | Start application services |
+| Method                                      | Description                                          |
+|---------------------------------------------|------------------------------------------------------|
+| `addServices(...services)`                  | Register services with application                   |
+| `requireService(serviceType)`               | Get service by type (throws if not found)            |
+| `getService(serviceType)`                   | Get service by type (returns undefined if not found) |
+| `getServices()`                             | Get all registered services                          |
+| `waitForService(serviceType, callback)`     | Wait for service to be available                     |
+| `getConfigSlice(key, schema)`               | Get validated config slice                           |
+| `serviceOutput(...messages)`                | Log system messages                                  |
+| `serviceError(...messages)`                 | Log error messages                                   |
+| `trackPromise(initiator)`                   | Track promise and log errors                         |
+| `scheduleEvery(interval, callback, signal)` | Schedule recurring task                              |
+| `shutdown()`                                | Stop the application                                 |
+| `run()`                                     | Start application services                           |
 
 ### StateManager
 
-| Method | Description |
-|--------|-------------|
-| `initializeState(StateClass, props)` | Initialize state slice |
-| `getState(StateClass)` | Get state slice |
-| `mutateState(StateClass, callback)` | Mutate state with callback |
-| `serialize()` | Serialize all state slices |
-| `deserialize(data, onMissing)` | Deserialize state slices |
-| `forEach(cb)` | Iterate over state slices |
-| `entries()` | Get [key, value] iterator |
-| `subscribe(StateClass, callback)` | Subscribe to changes |
-| `waitForState(StateClass, predicate)` | Wait for state predicate |
-| `timedWaitForState(StateClass, predicate, timeout)` | Wait with timeout |
-| `subscribeAsync(StateClass, signal)` | Async state generator |
+| Method                                              | Description                |
+|-----------------------------------------------------|----------------------------|
+| `initializeState(StateClass, props)`                | Initialize state slice     |
+| `getState(StateClass)`                              | Get state slice            |
+| `mutateState(StateClass, callback)`                 | Mutate state with callback |
+| `serialize()`                                       | Serialize all state slices |
+| `deserialize(data, onMissing)`                      | Deserialize state slices   |
+| `forEach(cb)`                                       | Iterate over state slices  |
+| `entries()`                                         | Get [key, value] iterator  |
+| `subscribe(StateClass, callback)`                   | Subscribe to changes       |
+| `waitForState(StateClass, predicate)`               | Wait for state predicate   |
+| `timedWaitForState(StateClass, predicate, timeout)` | Wait with timeout          |
+| `subscribeAsync(StateClass, signal)`                | Async state generator      |
 
 ### PluginManager
 
-| Method | Description |
-|--------|-------------|
-| `installPlugins(plugins)` | Install plugins with validation |
-| `getPlugins()` | Get all installed plugins |
-| `reconfigurePlugins(newConfig)` | Reconfigure all plugins |
+| Method                          | Description                     |
+|---------------------------------|---------------------------------|
+| `installPlugins(plugins)`       | Install plugins with validation |
+| `getPlugins()`                  | Get all installed plugins       |
+| `reconfigurePlugins(newConfig)` | Reconfigure all plugins         |
 
 ### buildTokenRingAppConfig
 
-| Parameter | Description |
-|-----------|-------------|
-| `workingDirectory` | Path to source/working directory |
-| `dataDirectory` | Path to data directory |
-| `configFileName` | Base name of config files (without extension) |
-| `configSchema` | Zod schema for validation |
-| `defaultConfig` | Default configuration |
-| `mergeConfig` | Optional config merge function (default: deepMerge) |
+| Parameter          | Description                                         |
+|--------------------|-----------------------------------------------------|
+| `workingDirectory` | Path to source/working directory                    |
+| `dataDirectory`    | Path to data directory                              |
+| `configFileName`   | Base name of config files (without extension)       |
+| `configSchema`     | Zod schema for validation                           |
+| `defaultConfig`    | Default configuration                               |
+| `mergeConfig`      | Optional config merge function (default: deepMerge) |
 
 ## Error Handling
 

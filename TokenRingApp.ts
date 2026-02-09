@@ -36,6 +36,12 @@ export default class TokenRingApp {
     const signal = this.abortController.signal;
     await Promise.all([
       ...this.services.getItems().map(async (service) => {
+        await service.start?.(signal);
+      })
+    ])
+
+    await Promise.all([
+      ...this.services.getItems().map(async (service) => {
         if (!service.run) return;
 
         while (!signal.aborted) {
@@ -59,6 +65,12 @@ export default class TokenRingApp {
         signal.addEventListener("abort", resolve);
       }),
     ]);
+
+    await Promise.all([
+      ...this.services.getItems().map(async (service) => {
+        await service.stop?.();
+      })
+    ])
   }
 
   waitForService = <R extends TokenRingService>(

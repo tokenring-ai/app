@@ -10,7 +10,7 @@ describe('StateManager', () => {
   }
 
   class MockStateSlice implements TestStateSlice {
-    name = 'MockStateSlice';
+    readonly name = 'MockStateSlice';
     data: string;
 
     constructor(props: { initialData: string }) {
@@ -31,7 +31,7 @@ describe('StateManager', () => {
   }
 
   class AnotherStateSlice implements TestStateSlice {
-    name = 'AnotherStateSlice';
+    readonly name = 'AnotherStateSlice';
     data: string;
 
     constructor(props: { initialData: string }) {

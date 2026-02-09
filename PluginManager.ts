@@ -5,7 +5,7 @@ import TokenRingApp, {type TokenRingAppConfig} from "./TokenRingApp";
 import type {TokenRingPlugin, TokenRingService} from "./types";
 
 export default class PluginManager implements TokenRingService {
-  name = "PluginManager";
+  readonly name = "PluginManager";
   description = "Manages plugins";
 
   private plugins = new TypedRegistry<TokenRingPlugin<ZodObject>>();

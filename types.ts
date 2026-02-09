@@ -3,13 +3,13 @@ import {z} from "zod";
 import TokenRingApp from "./TokenRingApp.ts";
 
 export type TokenRingPlugin<ConfigType> = {
-  name: string;
+  readonly name: string;
   version: string;
   description: string;
   install?: (app: TokenRingApp) => void | undefined; // Install does not allow awaiting, anything awaited must be done in start
   start?: (app: TokenRingApp) => Promise<void> | void;
 } | {
-  name: string;
+  readonly name: string;
   version: string;
   description: string;
   config: ConfigType;
@@ -18,9 +18,11 @@ export type TokenRingPlugin<ConfigType> = {
   reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
 };
 export interface TokenRingService {
-  name: string; // Must match class name
+  readonly name: string;
   description: string;
-  run?(signal: AbortSignal): Promise<void> | void;
+  run?(signal: AbortSignal): Promise<void>;
+  start?(signal: AbortSignal): Promise<void> | void;
+  stop?(): Promise<void> | void;
   attach?(agent: Agent): void;
   detach?(agent: Agent): void;
 }
