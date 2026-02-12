@@ -29,7 +29,7 @@ export default class PluginManager implements TokenRingService {
 
     for (const plugin of plugins) {
       try {
-        if (plugin.start) plugin.start(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+        if (plugin.start) await plugin.start(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
       } catch (error) {
         console.error(`Error starting plugin "${plugin.name}":`, error);
         throw error;
