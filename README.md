@@ -13,7 +13,6 @@ Base application framework for TokenRing applications, providing service managem
 - **State Isolation**: Separate state slices with serialization and deserialization support
 - **Signal-Based Shutdown**: Graceful termination using AbortSignal
 - **Promise Tracking**: Automatic error handling for async operations
-- **Scheduled Tasks**: Built-in task scheduling for recurring operations
 - **Comprehensive Logging**: Structured output for system messages and errors
 - **Async State Subscriptions**: Support for async state observation with abort handling
 
@@ -100,17 +99,6 @@ trackPromise(initiator: (signal: AbortSignal) => Promise<void>): void
 ```
 Track an app-level promise and log any errors that occur.
 
-##### Scheduling
-
-```typescript
-scheduleEvery(
-  interval: number,
-  callback: () => Promise<void>,
-  signal?: AbortSignal
-): void
-```
-Schedule a recurring task with a specified interval. The task runs until aborted.
-
 ##### Configuration
 
 ```typescript
@@ -121,9 +109,9 @@ Get a validated config slice using a Zod schema. Throws if the key doesn't exist
 ##### Lifecycle
 
 ```typescript
-shutdown(): void
+shutdown(reason?: string): void
 ```
-Stop the application by aborting the internal AbortController.
+Stop the application by aborting the internal AbortController. Accepts an optional reason string.
 
 ```typescript
 run(): Promise<void>
@@ -272,7 +260,7 @@ Build application configuration by loading from multiple locations with Zod vali
 | defaultConfig    | z.input<ConfigSchema> | Default configuration                               |
 | mergeConfig      | function              | Optional config merge function (default: deepMerge) |
 
-**Config Loading Order:** Config files are loaded from `~` (home) and `dataDirectory` in that order, with extensions `.ts`, `.mjs`, `.cjs`, `.js`.
+**Config Loading Order:** Config files are loaded from `~` (home) and `dataDirectory` in that order, with extensions `.ts`, `.mjs`, `.cjs`, `.js`. The config is validated at each step to ensure it is well-formed.
 
 ## Types
 
@@ -284,6 +272,8 @@ interface TokenRingService {
   description: string;
 
   run?(signal: AbortSignal): Promise<void> | void;
+  start?(signal: AbortSignal): Promise<void> | void;
+  stop?(): Promise<void> | void;
   attach?(agent: Agent): void;
   detach?(agent: Agent): void;
 }
@@ -291,31 +281,42 @@ interface TokenRingService {
 
 ### TokenRingPlugin
 
+There are two types of plugins:
+
+#### Simple Plugin (no config)
+
 ```typescript
-type TokenRingPlugin<ConfigType> = {
+{
   name: string;
   version: string;
   description: string;
   install?: (app: TokenRingApp) => void | undefined; // Install does not allow awaiting, anything awaited must be done in start
   start?: (app: TokenRingApp) => Promise<void> | void;
-} | {
+}
+```
+
+#### Plugin with Configuration
+
+```typescript
+{
   name: string;
   version: string;
   description: string;
-  config: ConfigType;
-  install?: (app: TokenRingApp, config: z.output<ConfigType>) => void | undefined; // Install does not allow awaiting, anything awaited must be done in start
+  config: ConfigType;  // Zod schema
+  install?: (app: TokenRingApp, config: z.output<ConfigType>) => void | undefined;
   start?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
   reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
-};
+}
 ```
 
 ### SerializableStateSlice
 
 ```typescript
-interface SerializableStateSlice {
+interface SerializableStateSlice<SerializationSchema> {
   name: string;
-  serialize(): object;
-  deserialize(data: object): void;
+  serialize: () => z.input<SerializationSchema>;
+  deserialize: (data: z.output<SerializationSchema>) => void;
+  serializationSchema: SerializationSchema;
 }
 ```
 
@@ -422,7 +423,7 @@ const myPlugin: TokenRingPlugin<typeof MyPluginConfigSchema> = {
   }
 };
 
-// Services can be registered directly
+// Add plugin to application
 app.addServices(myPlugin);
 ```
 
@@ -431,14 +432,20 @@ app.addServices(myPlugin);
 ```typescript
 import StateManager from "@tokenring-ai/app/StateManager";
 import type { SerializableStateSlice } from "@tokenring-ai/app/StateManager";
+import { z } from "zod";
 
-interface UserState extends SerializableStateSlice {
+const serializationSchema = z.object({
+  data: z.string(),
+});
+
+interface UserState extends SerializableStateSlice<typeof serializationSchema> {
   name: string;
   email: string;
 }
 
 class UserStateSlice implements UserState {
-  name = "UserState";
+  readonly name = "UserState";
+  serializationSchema = serializationSchema;
   name: string;
   email: string;
 
@@ -451,9 +458,9 @@ class UserStateSlice implements UserState {
     return { name: this.name, email: this.email };
   }
 
-  deserialize(data: object) {
-    this.name = (data as UserState).name;
-    this.email = (data as UserState).email;
+  deserialize(data: z.output<typeof serializationSchema>) {
+    this.name = data.name;
+    this.email = data.email;
   }
 }
 
@@ -461,7 +468,7 @@ class UserStateSlice implements UserState {
 const stateManager = new StateManager<UserState>();
 stateManager.initializeState(
   UserStateSlice,
-  new UserStateSlice({ name: "John", email: "john@example.com" })
+  { name: "John", email: "john@example.com" }
 );
 
 // Update state
@@ -482,19 +489,6 @@ const stateStream = stateManager.subscribeAsync(UserStateSlice, signal);
 for await (const state of stateStream) {
   console.log("New state:", state);
 }
-```
-
-### Scheduled Tasks
-
-```typescript
-// Schedule a task that runs every 5 seconds
-app.scheduleEvery(5000, async () => {
-  const result = await fetchData();
-  console.log("Scheduled task result:", result);
-});
-
-// The task can be stopped by shutting down the app
-app.shutdown();
 ```
 
 ### Build Config from Files
@@ -618,8 +612,7 @@ const myPlugin: TokenRingPlugin<typeof MyPluginSchema> = {
 | `serviceOutput(...messages)`                | Log system messages                                  |
 | `serviceError(...messages)`                 | Log error messages                                   |
 | `trackPromise(initiator)`                   | Track promise and log errors                         |
-| `scheduleEvery(interval, callback, signal)` | Schedule recurring task                              |
-| `shutdown()`                                | Stop the application                                 |
+| `shutdown(reason?)`                         | Stop the application with optional reason            |
 | `run()`                                     | Start application services                           |
 
 ### StateManager
