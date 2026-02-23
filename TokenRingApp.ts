@@ -49,11 +49,11 @@ export default class TokenRingApp {
             await service.run(signal);
             // If run() completes without error but we aren't aborted, it exited "normally"
             if (!signal.aborted) {
-              this.serviceError(`Service ${service.constructor.name} exited unexpectedly. Restarting in 5s...`);
+              this.serviceError(service,`Exited unexpectedly. Restarting in 5s...`);
             }
           } catch (err) {
             if (!signal.aborted) {
-              this.serviceError(`Service ${service.constructor.name} died with error:`, err, "Restarting in 5s...");
+              this.serviceError(service,`Died with error:`, err, "Restarting in 5s...");
             }
           }
 
@@ -78,22 +78,22 @@ export default class TokenRingApp {
   /**
    * Log a system message
    */
-  serviceOutput(...messages: any[]): void {
-    const message = formatLogMessages(messages);
+  serviceOutput(service: TokenRingService, ...messages: any[]): void {
+    const message = `[${service.name}] ${formatLogMessages(messages)}`;
     this.logs.push({ timestamp: Date.now(), level: "info", message: message });
   }
 
-  serviceError(...messages: any[]): void {
-    const message = formatLogMessages(messages);
+  serviceError(service: TokenRingService, ...messages: any[]): void {
+    const message = `[${service.name}] ${formatLogMessages(messages)}`;
     this.logs.push({ timestamp: Date.now(), level: "error", message: message });
   }
 
   /*
    * Track an app-level promise and log any errors that occur.
    */
-  trackPromise(initiator: (signal: AbortSignal) => Promise<void>) : void {
+  trackPromise(service: TokenRingService, initiator: (signal: AbortSignal) => Promise<void>) : void {
     initiator(this.abortController.signal)
-      .catch((err) => this.serviceError("[TokenRingApp] Error:", err));
+      .catch((err) => this.serviceError(service,"Error:", err));
   }
 
   /**
