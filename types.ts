@@ -1,4 +1,5 @@
 import Agent from "@tokenring-ai/agent/Agent";
+import type {AgentCreationContext} from "@tokenring-ai/agent/types";
 import {z} from "zod";
 import TokenRingApp from "./TokenRingApp.ts";
 
@@ -23,6 +24,6 @@ export interface TokenRingService {
   run?(signal: AbortSignal): Promise<void>;
   start?(signal: AbortSignal): Promise<void> | void;
   stop?(): Promise<void> | void;
-  attach?(agent: Agent): void;
+  attach?(agent: Agent, creationContext: AgentCreationContext): void;
   detach?(agent: Agent): void;
 }
