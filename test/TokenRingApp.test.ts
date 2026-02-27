@@ -75,7 +75,7 @@ describe('TokenRingApp', () => {
     it('should track promises and log errors', async () => {
       const mockPromise = vi.fn().mockRejectedValue(new Error('Test error'));
       
-      app.trackPromise(mockPromise);
+      app.runBackgroundTask(mockPromise);
       
       // Wait for the promise to resolve (trackPromise doesn't await)
       await setTimeout(10);

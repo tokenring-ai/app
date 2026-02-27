@@ -91,7 +91,7 @@ export default class TokenRingApp {
   /*
    * Track an app-level promise and log any errors that occur.
    */
-  trackPromise(service: TokenRingService, initiator: (signal: AbortSignal) => Promise<void>) : void {
+  runBackgroundTask(service: TokenRingService, initiator: (signal: AbortSignal) => Promise<void>) : void {
     initiator(this.abortController.signal)
       .catch((err) => this.serviceError(service,"Error:", err));
   }
