@@ -75,6 +75,10 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
         onMissing?.(key);
       }
     }
+
+    for (const [key, slice] of this.state.entries()) {
+      this.subscribers.get(key)?.forEach(cb => cb(slice));
+    }
   }
 
   entries(): IterableIterator<[string, SpecificStateSliceType]> {

@@ -1,9 +1,9 @@
+import {setTimeout} from "timers/promises";
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import PluginManager from '../PluginManager';
 import StateManager from '../StateManager';
 import TokenRingApp from '../TokenRingApp';
 import type {TokenRingPlugin, TokenRingService} from '../types';
-import { setTimeout} from "timers/promises";
 
 describe('App Integration Tests', () => {
   let app: TokenRingApp;

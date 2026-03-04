@@ -16,6 +16,7 @@ Base application framework for TokenRing applications, providing service managem
 - **Comprehensive Logging**: Structured output for system messages and errors with service context
 - **Async State Subscriptions**: Support for async state observation with abort handling
 - **Service Auto-Restart**: Services that exit unexpectedly are automatically restarted after 5 seconds
+- **Session Tracking**: Each app instance has a unique session ID for tracking and debugging
 
 ## Installation
 
@@ -47,6 +48,7 @@ constructor(readonly packageDirectory: string, readonly config: TokenRingAppConf
 | config           | TokenRingAppConfig              | The application configuration       |
 | packageDirectory | string                          | Path to the application directory   |
 | logs             | LogEntry[]                      | Array of logged system messages     |
+| sessionId        | string                          | Unique session ID for this instance |
 | services         | TypedRegistry<TokenRingService> | Registry of all registered services |
 | abortController  | AbortController                 | Internal abort controller for shutdown |
 
@@ -416,6 +418,8 @@ const app = new TokenRingApp("/path/to/app", {
   apiKey: process.env.API_KEY,
   model: "gpt-4"
 });
+
+console.log(app.sessionId); // Unique session ID for this instance
 ```
 
 ### Service Management
@@ -561,6 +565,11 @@ try {
   await stateManager.timedWaitForState(UserStateSlice, (state) => state.name === "Jane", 5000);
 } catch (error) {
   console.log("Timeout waiting for state");
+}
+
+// Iterate over state entries
+for (const [key, slice] of stateManager.entries()) {
+  console.log(`State: ${key}`, slice);
 }
 ```
 

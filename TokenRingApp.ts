@@ -1,6 +1,7 @@
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import {setTimeout} from "timers/promises";
+import {v4 as uuid} from 'uuid';
 import {z} from "zod";
 import type {TokenRingService} from "./types.ts";
 
@@ -16,7 +17,7 @@ export type LogEntry = {
 export default class TokenRingApp {
   readonly logs: LogEntry[] = [];
   private readonly abortController = new AbortController();
-
+  readonly sessionId = uuid()
   constructor(readonly packageDirectory: string, readonly config: TokenRingAppConfig) {}
 
   services = new TypedRegistry<TokenRingService>();

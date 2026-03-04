@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import StateManager, {SerializableStateSlice} from '../StateManager.ts';
 import z from "zod";
+import StateManager, {SerializableStateSlice} from '../StateManager.ts';
 
 const serializationSchema = z.object({
   data: z.string(),

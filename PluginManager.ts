@@ -1,5 +1,5 @@
-import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import deepEquals from "@tokenring-ai/utility/object/deepEquals";
+import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import {ZodObject} from "zod";
 import TokenRingApp, {type TokenRingAppConfig} from "./TokenRingApp";
 import type {TokenRingPlugin, TokenRingService} from "./types";
