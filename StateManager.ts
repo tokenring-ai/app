@@ -1,10 +1,18 @@
-import {z} from "zod";
+import {z, type ZodObject} from "zod";
 
-export interface SerializableStateSlice<SerializationSchema> {
-  readonly name: string;
-  serialize: () => z.input<SerializationSchema>;
-  deserialize: (data: z.output<SerializationSchema>) => void;
-  serializationSchema: SerializationSchema;
+export type StateSnapshot = Record<string, unknown>;
+
+export abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> {
+  constructor(public readonly name: string, public readonly serializationSchema: SerializationSchema) {}
+  abstract serialize(): z.input<SerializationSchema>;
+  abstract deserialize(data: z.output<SerializationSchema>): void;
+
+  getValidatedState(stateSnapshot: StateSnapshot): z.output<SerializationSchema> | null {
+    if (Object.hasOwn(stateSnapshot, this.name)) {
+      return this.serializationSchema.parse(stateSnapshot[this.name]);
+    }
+    return null;
+  }
 }
 
 export interface StateStorageInterface<SpecificStateSliceType extends SerializableStateSlice<any>> {
@@ -22,31 +30,42 @@ export interface StateStorageInterface<SpecificStateSliceType extends Serializab
 }
 
 export default class StateManager<SpecificStateSliceType extends SerializableStateSlice<any>> implements StateStorageInterface<SpecificStateSliceType> {
-  state = new Map<string, SpecificStateSliceType>();
-  private subscribers = new Map<string, Set<(state: any) => void>>();
+  state = new Map<Function, SpecificStateSliceType>();
+  private subscribers = new Map<Function, Set<(state: any) => void>>();
+
+  constructor(private startingState: Record<string, unknown> = {}) {}
+
+  setStartingState(state: Record<string, unknown>) {
+    this.startingState = state;
+  }
 
   initializeState<S, T extends SpecificStateSliceType>(
     ClassType: new (props: S) => T,
     props: S,
   ): void {
-    this.state.set(ClassType.name, new ClassType(props));
+    const slice = new ClassType(props)
+    this.state.set(ClassType, slice);
+
+    if (Object.hasOwn(this.startingState, slice.name)) {
+      slice.deserialize(slice.serializationSchema.parse(this.startingState[slice.name]));
+    }
   }
 
   mutateState<R, T extends SpecificStateSliceType>(
     ClassType: new (...args: any[]) => T,
     callback: (state: T) => R,
   ): R {
-    const state = this.state.get(ClassType.name) as T;
+    const state = this.state.get(ClassType) as T;
     if (!state) {
       throw new Error(`State slice ${ClassType.name} not found`);
     }
     const result = callback(state);
-    this.subscribers.get(ClassType.name)?.forEach(cb => cb(state));
+    this.subscribers.get(ClassType)?.forEach(cb => cb(state));
     return result;
   }
 
   getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T {
-    const stateSlice = this.state.get(ClassType.name);
+    const stateSlice = this.state.get(ClassType);
     if (!stateSlice) {
       throw new Error(`State slice ${ClassType.name} not found`);
     }
@@ -66,42 +85,35 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     );
   }
 
-  deserialize(data: Record<string, object>, onMissing?: (key: string) => void): void {
-    for (const key in data) {
-      const slice = this.state.get(key);
-      if (slice) {
-        slice.deserialize(slice.serializationSchema.parse(data[key]));
-      } else {
-        onMissing?.(key);
-      }
+  deserialize(data: Record<string, unknown>, onMissing?: (key: string) => void): void {
+    for (const slice of this.state.values()) {
+      slice.deserialize(slice.serializationSchema.parse(data[slice.name]));
     }
-
-    for (const [key, slice] of this.state.entries()) {
-      this.subscribers.get(key)?.forEach(cb => cb(slice));
+    for (const slice of this.state.keys()) {
+      this.subscribers.get(slice)?.forEach(cb => cb(slice));
     }
   }
 
-  entries(): IterableIterator<[string, SpecificStateSliceType]> {
-    return this.state.entries();
+  slices(): IterableIterator<SpecificStateSliceType> {
+    return this.state.values();
   }
 
   subscribe<T extends SpecificStateSliceType>(
     ClassType: new (...args: any[]) => T,
     callback: (state: T) => void,
   ): () => void {
-    const key = ClassType.name;
-    if (!this.subscribers.has(key)) {
-      this.subscribers.set(key, new Set());
+    if (!this.subscribers.has(ClassType)) {
+      this.subscribers.set(ClassType, new Set());
     }
-    this.subscribers.get(key)!.add(callback);
+    this.subscribers.get(ClassType)!.add(callback);
 
     queueMicrotask(() => {
-      if (this.subscribers.get(key)?.has(callback)) {
+      if (this.subscribers.get(ClassType)?.has(callback)) {
         callback(this.getState(ClassType))
       }
     });
 
-    return () => this.subscribers.get(key)?.delete(callback);
+    return () => this.subscribers.get(ClassType)?.delete(callback);
   }
 
   async timedWaitForState<T extends SpecificStateSliceType>(

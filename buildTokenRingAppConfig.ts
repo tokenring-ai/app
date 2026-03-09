@@ -1,25 +1,14 @@
 import deepMerge from "@tokenring-ai/utility/object/deepMerge";
 import fs from "node:fs";
 import path from "path";
-import {z, ZodObject} from "zod";
+import {z} from "zod";
+import {type TokenRingAppConfig, TokenRingAppConfigSchema} from "./TokenRingApp.ts";
 
-type CreateTokenRingAppOptions<ConfigSchema extends ZodObject> = {
-  workingDirectory: string,
-  dataDirectory: string,
-  configFileName: string,
-  configSchema: ConfigSchema,
-  defaultConfig: z.input<ConfigSchema>,
-  mergeConfig?: (prevConfig: z.input<ConfigSchema>, configToMerge: z.input<ConfigSchema>) => z.input<ConfigSchema>
-};
 
-export default async function buildTokenRingAppConfig<ConfigSchema extends ZodObject>({
-                                                                     workingDirectory,
-                                                                     dataDirectory,
-                                                                     configFileName,
-                                                                     configSchema,
-                                                                     defaultConfig,
-                                                                     mergeConfig = deepMerge
-                                                                    }: CreateTokenRingAppOptions<ConfigSchema>): Promise<z.output<ConfigSchema>> {
+export default async function buildTokenRingAppConfig<
+  T extends z.ZodTypeAny
+>(defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): Promise<z.output<T>> {
+  const { workingDirectory, dataDirectory, configFileName, configSchema } = defaultConfig.app;
   if (!fs.existsSync(workingDirectory)) {
     throw new Error(`Source directory not found: ${workingDirectory}`);
   }
@@ -36,7 +25,7 @@ export default async function buildTokenRingAppConfig<ConfigSchema extends ZodOb
   const possibleConfigExtensions = ["ts", "mjs", "cjs", "js"];
 
   let mergedConfig = defaultConfig;
-  let parsedConfig = configSchema.parse(defaultConfig);
+  let parsedConfig = configSchema.parse(defaultConfig) as z.output<T>;
 
   // Try each directory and extension in order
   for (const dir of ["~", dataDirectory]) {
@@ -44,8 +33,8 @@ export default async function buildTokenRingAppConfig<ConfigSchema extends ZodOb
       const potentialConfig = path.join(dir, `${configFileName}.${ext}`);
       if (fs.existsSync(potentialConfig)) {
         const config = await import(potentialConfig);
-        mergedConfig = mergeConfig(mergedConfig, config.default ?? config);
-        parsedConfig = configSchema.parse(mergedConfig); // We parse the config each time to verify that it is complete and well formed at all steps.
+        mergedConfig = deepMerge(mergedConfig, config.default ?? config);
+        parsedConfig = configSchema.parse(mergedConfig) as z.output<T>; // We parse the config each time to verify that it is complete and well formed at all steps.
         break;
       }
     }

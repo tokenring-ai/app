@@ -1,12 +1,25 @@
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
-import {setTimeout} from "timers/promises";
+import process from "node:process";
+import {setTimeout as setTimeoutPromise} from "timers/promises";
 import {v4 as uuid} from 'uuid';
 import {z} from "zod";
-import type {TokenRingService} from "./types.ts";
+import StateManager from "./StateManager.ts";
+import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./types.ts";
 
-export const TokenRingAppConfigSchema = z.record(z.string(), z.unknown());
-export type TokenRingAppConfig = z.infer<typeof TokenRingAppConfigSchema>;
+export const TokenRingAppConfigSchema = z.object({
+  app: z.object({
+    workingDirectory: z.string(),
+    dataDirectory: z.string(),
+    configFileName: z.string(),
+    configSchema: z.custom<z.ZodTypeAny>(),
+    packageDirectory: z.string(),
+    hostname: z.string(),
+  })
+});
+
+export const LooseTokenRingAppConfigSchema = TokenRingAppConfigSchema.loose();
+export type TokenRingAppConfig = z.output<typeof LooseTokenRingAppConfigSchema>;
 
 export type LogEntry = {
   timestamp: number;
@@ -17,8 +30,12 @@ export type LogEntry = {
 export default class TokenRingApp {
   readonly logs: LogEntry[] = [];
   private readonly abortController = new AbortController();
-  readonly sessionId = uuid()
-  constructor(readonly packageDirectory: string, readonly config: TokenRingAppConfig) {}
+  readonly sessionId = uuid();
+  readonly stateManager = new StateManager<AppStateSlice<any>>();
+  readonly runningServices = new Set<TokenRingService>();
+  readonly backgroundTasks = new Map<TokenRingService, number>();
+
+  constructor(readonly config: TokenRingAppConfig) {}
 
   services = new TypedRegistry<TokenRingService>();
 
@@ -31,19 +48,91 @@ export default class TokenRingApp {
 
   shutdown(reason: string = "App shutdown for unknown reason") {
     this.abortController.abort(reason);
+
+    process.stdout.write(`\x1b[${process.stdout.rows || 24};0H`);
+    process.stdout.write(`Shutting down services...please wait\n`);
+
+    let count = 0;
+    setInterval(() => {
+      count++;
+      const analysis = new Map<TokenRingService, { backgroundTasks: number, running: boolean }>();
+      for (const service of this.runningServices) {
+        analysis.set(service, { backgroundTasks: 0, running: true });
+      }
+      for (const [service, count] of this.backgroundTasks.entries()) {
+        if (count > 0) {
+          const entry = analysis.get(service) ?? {backgroundTasks: 0, running: false};
+          analysis.set(service, {backgroundTasks: count, running: entry.running});
+        }
+      }
+
+      if (analysis.size === 0) {
+        process.stdout.write(`App shutdown complete\n`);
+        process.exit(0);
+      }
+
+      if (count % 4 === 0) {
+        process.stdout.write(`
+App shutdown in progress: ${count * 0.5}s...
+Services still running:
+${Array.from(analysis.entries()).map(([service, {backgroundTasks, running}]) =>
+          `- ${service.name}: Main thread ${running ? "running" : "complete"} ${backgroundTasks} background tasks running`
+        ).join("\n")}
+`.trimStart());
+      }
+    }, 500);
+
+    /*
+    //TODO: Figure out what is making the event loop hang.
+    const hungServiceTimer = setTimeout(() => {
+      if (this.runningServices.size === 0 && this.backgroundTasks.size === 0) {
+        process.stdout.write(`[TokenRingApp] Has not shut down for 15s, and the task hanging the event loop was not registered with TokenRingApp\n`);
+        return;
+      }
+      for (const service of this.runningServices.values()) {
+        process.stdout.write(`[${service.name}] Has not shut down for 15s...\n`);
+      }
+
+      for (const [service, count] of this.backgroundTasks.entries()) {
+        process.stdout.write(`[${service.name}] Has ${count} background tasks running, which are preventing the shutdown from completing...\n`);
+      }
+    }, 15000);
+    hungServiceTimer.unref();*/
   }
+
+
+  generateStateCheckpoint(): AppSessionCheckpoint {
+    return {
+      sessionId: this.sessionId,
+      createdAt: Date.now(),
+      hostname: this.config.app.hostname,
+      workingDirectory: this.config.app.workingDirectory,
+      state: this.stateManager.serialize()
+    };
+  }
+
+  restoreState(state: AppSessionCheckpoint["state"]) {
+    this.stateManager.deserialize(state, (key) => {
+      const message = `[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`;
+      this.logs.push({ timestamp: Date.now(), level: "info", message: message });
+    });
+  }
+
 
   async run() {
     const signal = this.abortController.signal;
     await Promise.all([
       ...this.services.getItems().map(async (service) => {
-        await service.start?.(signal);
+        if (service.start) {
+          await service.start(signal);
+        }
       })
     ])
 
     await Promise.all([
       ...this.services.getItems().map(async (service) => {
         if (!service.run) return;
+        this.runningServices.add(service);
 
         while (!signal.aborted) {
           try {
@@ -59,14 +148,19 @@ export default class TokenRingApp {
           }
 
           if (signal.aborted) break;
-          await setTimeout(5000, null, {signal}).catch(err => null);
+          await setTimeoutPromise(5000, null, {signal}).catch(err => null);
         }
+        this.runningServices.delete(service);
       }),
     ]);
 
     await Promise.all([
       ...this.services.getItems().map(async (service) => {
-        await service.stop?.();
+        if (service.stop) {
+          this.runningServices.add(service);
+          await service.stop();
+          this.runningServices.delete(service);
+        }
       })
     ])
   }
@@ -93,8 +187,14 @@ export default class TokenRingApp {
    * Track an app-level promise and log any errors that occur.
    */
   runBackgroundTask(service: TokenRingService, initiator: (signal: AbortSignal) => Promise<void>) : void {
+    const count = this.backgroundTasks.get(service) || 0;
+    this.backgroundTasks.set(service, count + 1);
     initiator(this.abortController.signal)
-      .catch((err) => this.serviceError(service,"Error:", err));
+      .catch((err) => this.serviceError(service,"Error:", err))
+      .finally(() => {
+        const count = this.backgroundTasks.get(service) || 0;
+        this.backgroundTasks.set(service, count - 1);
+      });
   }
 
   /**

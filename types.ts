@@ -1,6 +1,7 @@
 import Agent from "@tokenring-ai/agent/Agent";
 import type {AgentCreationContext} from "@tokenring-ai/agent/types";
-import {z} from "zod";
+import {z, type ZodObject} from "zod";
+import {SerializableStateSlice} from "./StateManager.ts";
 import TokenRingApp from "./TokenRingApp.ts";
 
 export type TokenRingPlugin<ConfigType> = {
@@ -26,4 +27,15 @@ export interface TokenRingService {
   stop?(): Promise<void> | void;
   attach?(agent: Agent, creationContext: AgentCreationContext): void;
   detach?(agent: Agent): void;
+}
+
+export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {
+}
+
+export interface AppSessionCheckpoint {
+  sessionId: string;
+  createdAt: number;
+  hostname: string;
+  workingDirectory: string;
+  state: Record<string, object>;
 }
