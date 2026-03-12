@@ -1,8 +1,8 @@
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
+import {generateHumanId} from "@tokenring-ai/utility/string/generateHumanId";
 import process from "node:process";
 import {setTimeout as setTimeoutPromise} from "timers/promises";
-import {v4 as uuid} from 'uuid';
 import {z} from "zod";
 import StateManager from "./StateManager.ts";
 import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./types.ts";
@@ -30,7 +30,7 @@ export type LogEntry = {
 export default class TokenRingApp {
   readonly logs: LogEntry[] = [];
   private readonly abortController = new AbortController();
-  readonly sessionId = uuid();
+  readonly sessionId = generateHumanId();
   readonly stateManager = new StateManager<AppStateSlice<any>>();
   readonly runningServices = new Set<TokenRingService>();
   readonly backgroundTasks = new Map<TokenRingService, number>();
