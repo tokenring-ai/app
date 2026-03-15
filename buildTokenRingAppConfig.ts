@@ -10,7 +10,7 @@ export default async function buildTokenRingAppConfig<
 >(defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): Promise<z.output<T>> {
   const { workingDirectory, dataDirectory, configFileName, configSchema } = defaultConfig.app;
   if (!fs.existsSync(workingDirectory)) {
-    throw new Error(`Source directory not found: ${workingDirectory}`);
+    throw new Error(`Working directory not found: ${workingDirectory}`);
   }
 
   if (!fs.existsSync(dataDirectory)) {
