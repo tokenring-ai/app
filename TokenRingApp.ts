@@ -9,12 +9,12 @@ import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./type
 
 export const TokenRingAppConfigSchema = z.object({
   app: z.object({
-    workingDirectory: z.string(),
+    //projectDirectory: z.string(),
     dataDirectory: z.string(),
     configFileName: z.string(),
     configSchema: z.custom<z.ZodTypeAny>(),
-    packageDirectory: z.string(),
-    hostname: z.string(),
+    //packageDirectory: z.string(),
+    //hostname: z.string(),
   })
 });
 
@@ -100,15 +100,8 @@ ${Array.from(analysis.entries()).map(([service, {backgroundTasks, running}]) =>
     hungServiceTimer.unref();*/
   }
 
-
-  generateStateCheckpoint(): AppSessionCheckpoint {
-    return {
-      sessionId: this.sessionId,
-      createdAt: Date.now(),
-      hostname: this.config.app.hostname,
-      workingDirectory: this.config.app.workingDirectory,
-      state: this.stateManager.serialize()
-    };
+  generateStateCheckpoint() {
+    return this.stateManager.serialize()
   }
 
   restoreState(state: AppSessionCheckpoint["state"]) {

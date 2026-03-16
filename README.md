@@ -413,18 +413,18 @@ interface AppSessionCheckpoint {
   sessionId: string;
   createdAt: number;
   hostname: string;
-  workingDirectory: string;
+  projectDirectory: string;
   state: Record<string, object>;
 }
 ```
 
-| Property | Description |
-|----------|-------------|
-| `sessionId` | Unique session ID |
-| `createdAt` | Timestamp when checkpoint was created |
-| `hostname` | Hostname of the machine |
-| `workingDirectory` | Working directory path |
-| `state` | Serialized state |
+| Property           | Description                           |
+|--------------------|---------------------------------------|
+| `sessionId`        | Unique session ID                     |
+| `createdAt`        | Timestamp when checkpoint was created |
+| `hostname`         | Hostname of the machine               |
+| `projectDirectory` | Working directory path                |
+| `state`            | Serialized state                      |
 
 ### StateStorageInterface
 
@@ -449,7 +449,7 @@ interface StateStorageInterface<SpecificStateSliceType extends SerializableState
 ```typescript
 export const TokenRingAppConfigSchema = z.object({
   app: z.object({
-    workingDirectory: z.string(),
+    projectDirectory: z.string(),
     dataDirectory: z.string(),
     configFileName: z.string(),
     configSchema: z.custom<z.ZodTypeAny>(),
@@ -481,7 +481,7 @@ import TokenRingApp from "@tokenring-ai/app";
 
 const config = {
   app: {
-    workingDirectory: "/path/to/app",
+    projectDirectory: "/path/to/app",
     dataDirectory: "/path/to/data",
     configFileName: "app.config",
     configSchema: null, // Will be replaced with actual schema
@@ -660,7 +660,7 @@ const AppConfigSchema = z.object({
 
 const config = await buildTokenRingAppConfig({
   app: {
-    workingDirectory: "/path/to/app",
+    projectDirectory: "/path/to/app",
     dataDirectory: "/path/to/data",
     configFileName: "app.config",
     configSchema: AppConfigSchema,
@@ -840,7 +840,7 @@ app.shutdown("User requested shutdown");
 ```typescript
 const TokenRingAppConfigSchema = z.object({
   app: z.object({
-    workingDirectory: z.string(),
+    projectDirectory: z.string(),
     dataDirectory: z.string(),
     configFileName: z.string(),
     configSchema: z.custom<z.ZodTypeAny>(),

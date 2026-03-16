@@ -1,6 +1,6 @@
 import Agent from "@tokenring-ai/agent/Agent";
 import type {AgentCreationContext} from "@tokenring-ai/agent/types";
-import {z, type ZodObject} from "zod";
+import {z} from "zod";
 import {SerializableStateSlice} from "./StateManager.ts";
 import TokenRingApp from "./TokenRingApp.ts";
 
@@ -36,6 +36,6 @@ export interface AppSessionCheckpoint {
   sessionId: string;
   createdAt: number;
   hostname: string;
-  workingDirectory: string;
+  projectDirectory: string;
   state: Record<string, object>;
 }

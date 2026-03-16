@@ -2,17 +2,12 @@ import deepMerge from "@tokenring-ai/utility/object/deepMerge";
 import fs from "node:fs";
 import path from "path";
 import {z} from "zod";
-import {type TokenRingAppConfig, TokenRingAppConfigSchema} from "./TokenRingApp.ts";
-
+import {TokenRingAppConfigSchema} from "./TokenRingApp.ts";
 
 export default async function buildTokenRingAppConfig<
   T extends z.ZodTypeAny
 >(defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): Promise<z.output<T>> {
-  const { workingDirectory, dataDirectory, configFileName, configSchema } = defaultConfig.app;
-  if (!fs.existsSync(workingDirectory)) {
-    throw new Error(`Working directory not found: ${workingDirectory}`);
-  }
-
+  const {dataDirectory, configFileName, configSchema} = defaultConfig.app;
   if (!fs.existsSync(dataDirectory)) {
     fs.mkdirSync(dataDirectory);
   }
