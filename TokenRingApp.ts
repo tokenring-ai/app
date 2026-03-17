@@ -49,8 +49,7 @@ export default class TokenRingApp {
   shutdown(reason: string = "App shutdown for unknown reason") {
     this.abortController.abort(reason);
 
-    process.stdout.write(`\x1b[${process.stdout.rows || 24};0H`);
-    process.stdout.write(`Shutting down services...please wait\n`);
+    this.logs.push({ timestamp: Date.now(), level: "info", message: `[TokenRingApp] Shutting down: ${reason}` });
 
     let count = 0;
     setInterval(() => {
@@ -67,7 +66,7 @@ export default class TokenRingApp {
       }
 
       if (analysis.size === 0) {
-        process.stdout.write(`App shutdown complete\n`);
+        //process.stdout.write(`App shutdown complete\n`);
         process.exit(0);
       }
 

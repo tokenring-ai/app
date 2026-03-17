@@ -19,19 +19,21 @@ export default class PluginManager implements TokenRingService {
   async installPlugins(plugins: TokenRingPlugin<any>[]): Promise<void> {
     for (const plugin of plugins) {
       try {
+        this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
         if (plugin.install) plugin.install(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
         this.plugins.register(plugin);
       } catch (error) {
-        console.error(`Error installing plugin "${plugin.name}":`, error);
+        this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
         throw error;
       }
     }
 
     for (const plugin of plugins) {
       try {
+        this.app.serviceOutput(this, `Starting plugin "${plugin.name}"`);
         if (plugin.start) await plugin.start(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
       } catch (error) {
-        console.error(`Error starting plugin "${plugin.name}":`, error);
+        this.app.serviceError(this, `Error starting plugin "${plugin.name}":`, error);
         throw error;
       }
     }
