@@ -39,8 +39,12 @@ describe('TokenRingApp', () => {
 
   describe('Logging', () => {
     it('should log service output messages', () => {
+      const mockService: TokenRingService = {
+        name: 'TestService',
+        description: 'Test service',
+      };
       const message = 'Test message';
-      app.serviceOutput(message);
+      app.serviceOutput(mockService, message);
       
       expect(app.logs).toHaveLength(1);
       expect(app.logs[0]).toEqual({
@@ -48,11 +52,16 @@ describe('TokenRingApp', () => {
         level: 'info',
         message: expect.stringContaining('Test message')
       });
+      expect(app.logs[0].message).toContain('[TestService]');
     });
 
     it('should log service error messages', () => {
+      const mockService: TokenRingService = {
+        name: 'TestService',
+        description: 'Test service',
+      };
       const error = 'Error message';
-      app.serviceError(error);
+      app.serviceError(mockService, error);
       
       expect(app.logs).toHaveLength(1);
       expect(app.logs[0]).toEqual({
@@ -60,11 +69,17 @@ describe('TokenRingApp', () => {
         level: 'error',
         message: expect.stringContaining('Error message')
       });
+      expect(app.logs[0].message).toContain('[TestService]');
     });
 
     it('should format multiple log messages', () => {
-      app.serviceOutput('Message', 'part', '2');
+      const mockService: TokenRingService = {
+        name: 'TestService',
+        description: 'Test service',
+      };
+      app.serviceOutput(mockService, 'Message', 'part', '2');
       
+      expect(app.logs[0].message).toContain('[TestService]');
       expect(app.logs[0].message).toContain('Message');
       expect(app.logs[0].message).toContain('part');
       expect(app.logs[0].message).toContain('2');
@@ -73,11 +88,15 @@ describe('TokenRingApp', () => {
 
   describe('Promise Tracking', () => {
     it('should track promises and log errors', async () => {
-      const mockPromise = vi.fn().mockRejectedValue(new Error('Test error'));
+      const mockService: TokenRingService = {
+        name: 'TestService',
+        description: 'Test service',
+      };
+      const mockInitiator = vi.fn().mockRejectedValue(new Error('Test error'));
       
-      app.runBackgroundTask(mockPromise);
+      app.runBackgroundTask(mockService, mockInitiator);
       
-      // Wait for the promise to resolve (trackPromise doesn't await)
+      // Wait for the promise to resolve
       await setTimeout(10);
       
       expect(app.logs).toHaveLength(1);
@@ -92,8 +111,17 @@ describe('TokenRingApp', () => {
         parse: vi.fn().mockReturnValue('parsed value')
       };
       
-      app.config['testKey'] = 'test value';
-      const result = app.getConfigSlice('testKey', mockSchema);
+      const config = {
+        app: {
+          dataDirectory: '/tmp',
+          configFileName: 'config',
+          configSchema: {} as any,
+        },
+        testKey: 'test value'
+      };
+      const appWithConfig = new TokenRingApp(config);
+      
+      const result = appWithConfig.getConfigSlice('testKey', mockSchema);
       
       expect(result).toBe('parsed value');
       expect(mockSchema.parse).toHaveBeenCalledWith('test value');
@@ -106,10 +134,18 @@ describe('TokenRingApp', () => {
         })
       };
       
-      app.config['testKey'] = 'test value';
+      const config = {
+        app: {
+          dataDirectory: '/tmp',
+          configFileName: 'config',
+          configSchema: {} as any,
+        },
+        testKey: 'test value'
+      };
+      const appWithConfig = new TokenRingApp(config);
       
       expect(() => {
-        app.getConfigSlice('testKey', mockSchema);
+        appWithConfig.getConfigSlice('testKey', mockSchema);
       }).toThrow('Invalid config value for key "testKey": Invalid schema');
     });
   });

@@ -1,4 +1,4 @@
-import {z, type ZodObject} from "zod";
+import {z} from "zod";
 
 export type StateSnapshot = Record<string, unknown>;
 
@@ -30,8 +30,8 @@ export interface StateStorageInterface<SpecificStateSliceType extends Serializab
 }
 
 export default class StateManager<SpecificStateSliceType extends SerializableStateSlice<any>> implements StateStorageInterface<SpecificStateSliceType> {
-  state = new Map<Function, SpecificStateSliceType>();
-  private subscribers = new Map<Function, Set<(state: any) => void>>();
+  state = new Map<new (...args: any[]) => SpecificStateSliceType, SpecificStateSliceType>();
+  private subscribers = new Map<new (...args: any[]) => SpecificStateSliceType, Set<(state: any) => void>>();
 
   constructor(private startingState: Record<string, unknown> = {}) {}
 
@@ -78,8 +78,8 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
   serialize(): Record<string, object> {
     return Object.fromEntries(
-      Array.from(this.state.entries()).map(([key, slice]) => [
-        key,
+      Array.from(this.state.values()).map(slice => [
+        slice.name,
         slice.serialize(),
       ]),
     );
@@ -87,10 +87,12 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
   deserialize(data: Record<string, unknown>, onMissing?: (key: string) => void): void {
     for (const slice of this.state.values()) {
-      slice.deserialize(slice.serializationSchema.parse(data[slice.name]));
-    }
-    for (const slice of this.state.keys()) {
-      this.subscribers.get(slice)?.forEach(cb => cb(slice));
+      const sliceData = data[slice.name];
+      if (sliceData === undefined) {
+        onMissing?.(slice.name);
+        continue;
+      }
+      slice.deserialize(slice.serializationSchema.parse(sliceData));
     }
   }
 

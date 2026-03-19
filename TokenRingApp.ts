@@ -6,6 +6,7 @@ import {setTimeout as setTimeoutPromise} from "timers/promises";
 import {z} from "zod";
 import StateManager from "./StateManager.ts";
 import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./types.ts";
+import {AppLogsState} from "./state/AppLogsState.ts";
 
 export const TokenRingAppConfigSchema = z.object({
   app: z.object({
@@ -28,14 +29,16 @@ export type LogEntry = {
 };
 
 export default class TokenRingApp {
-  readonly logs: LogEntry[] = [];
   private readonly abortController = new AbortController();
   readonly sessionId = generateHumanId();
   readonly stateManager = new StateManager<AppStateSlice<any>>();
   readonly runningServices = new Set<TokenRingService>();
   readonly backgroundTasks = new Map<TokenRingService, number>();
 
-  constructor(readonly config: TokenRingAppConfig) {}
+  constructor(readonly config: TokenRingAppConfig) {
+    // Initialize the logs state slice
+    this.stateManager.initializeState(AppLogsState, {});
+  }
 
   services = new TypedRegistry<TokenRingService>();
 
@@ -46,10 +49,23 @@ export default class TokenRingApp {
     this.services.register(...services);
   }
 
+  /**
+   * Get the logs array
+   */
+  get logs(): LogEntry[] {
+    return this.stateManager.getState(AppLogsState).getLogs();
+  }
+
+  private log(level: "info" | "error", message: string) {
+    this.stateManager.mutateState(AppLogsState, state => {
+      state.addLog(level, message);
+    });
+  }
+
   shutdown(reason: string = "App shutdown for unknown reason") {
     this.abortController.abort(reason);
 
-    this.logs.push({ timestamp: Date.now(), level: "info", message: `[TokenRingApp] Shutting down: ${reason}` });
+    this.log("info",`[TokenRingApp] Shutting down: ${reason}`);
 
     let count = 0;
     setInterval(() => {
@@ -105,8 +121,7 @@ ${Array.from(analysis.entries()).map(([service, {backgroundTasks, running}]) =>
 
   restoreState(state: AppSessionCheckpoint["state"]) {
     this.stateManager.deserialize(state, (key) => {
-      const message = `[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`;
-      this.logs.push({ timestamp: Date.now(), level: "info", message: message });
+      this.log("info",`[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`);
     });
   }
 
@@ -167,12 +182,12 @@ ${Array.from(analysis.entries()).map(([service, {backgroundTasks, running}]) =>
    */
   serviceOutput(service: TokenRingService, ...messages: any[]): void {
     const message = `[${service.name}] ${formatLogMessages(messages)}`;
-    this.logs.push({ timestamp: Date.now(), level: "info", message: message });
+    this.log("info", message)
   }
 
   serviceError(service: TokenRingService, ...messages: any[]): void {
     const message = `[${service.name}] ${formatLogMessages(messages)}`;
-    this.logs.push({ timestamp: Date.now(), level: "error", message: message });
+    this.log("error", message)
   }
 
   /*

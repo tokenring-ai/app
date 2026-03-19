@@ -164,21 +164,23 @@ describe('StateManager', () => {
       expect(stateManager.getState(AnotherStateSlice).data).toBe('deserialized 2');
     });
 
-    it('should call onMissing callback for unknown state slices', () => {
+    it('should call onMissing callback for missing state slices in data', () => {
       const data = {
-        UnknownStateSlice: { data: 'unknown' }
+        MockStateSlice: { data: 'known' }
+        // AnotherStateSlice is missing
       };
 
       const onMissing = vi.fn();
 
       stateManager.deserialize(data, onMissing);
 
-      expect(onMissing).toHaveBeenCalledWith('UnknownStateSlice');
+      expect(onMissing).toHaveBeenCalledWith('AnotherStateSlice');
     });
 
-    it('should not call onMissing when all slices are known', () => {
+    it('should not call onMissing when all slices are present in data', () => {
       const data = {
-        MockStateSlice: { data: 'known' }
+        MockStateSlice: { data: 'known' },
+        AnotherStateSlice: { data: 'also known' }
       };
 
       const onMissing = vi.fn();
@@ -206,14 +208,12 @@ describe('StateManager', () => {
       expect(iterated).toContain('AnotherStateSlice');
     });
 
-    it('should provide entries iterator', () => {
-      const entries = Array.from(stateManager.entries());
+    it('should provide slices iterator', () => {
+      const slices = Array.from(stateManager.slices());
       
-      expect(entries).toHaveLength(2);
-      expect(entries[0][0]).toBe('MockStateSlice');
-      expect(entries[1][0]).toBe('AnotherStateSlice');
-      expect(entries[0][1]).toBeInstanceOf(MockStateSlice);
-      expect(entries[1][1]).toBeInstanceOf(AnotherStateSlice);
+      expect(slices).toHaveLength(2);
+      expect(slices[0]).toBeInstanceOf(MockStateSlice);
+      expect(slices[1]).toBeInstanceOf(AnotherStateSlice);
     });
   });
 

@@ -5,18 +5,6 @@ import TokenRingApp from '../TokenRingApp';
 import type {TokenRingPlugin} from '../types';
 import createTestingApp from "./createTestingApp";
 
-// Mock TokenRingApp to avoid complex dependencies
-vi.mock('./TokenRingApp', () => {
-  return {
-    default: class MockTokenRingApp {
-      addServices = vi.fn();
-      services = {
-        register: vi.fn()
-      };
-    }
-  };
-});
-
 describe('PluginManager', () => {
   let mockApp: TokenRingApp;
   let pluginManager: PluginManager;
@@ -24,7 +12,7 @@ describe('PluginManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Create a mock app instance
+    // Create a real app instance for proper testing
     mockApp = createTestingApp();
     pluginManager = new PluginManager(mockApp);
   });
@@ -51,42 +39,48 @@ describe('PluginManager', () => {
 
   describe('Plugin Installation', () => {
     beforeEach(() => {
+      // Create fresh instances for each test
+      mockApp = createTestingApp();
       pluginManager = new PluginManager(mockApp);
     });
 
     it('should install single plugin successfully', async () => {
-      const mockPlugin: TokenRingPlugin = {
-        name: 'TestPlugin',
-        version: '1.0.0',
-        description: 'A test plugin',
-        install: vi.fn(),
-        start: vi.fn().mockResolvedValue(undefined),
-        configSchema: z.object({})
-      };
+      class TestPlugin {
+        readonly name = 'TestPlugin';
+        version = '1.0.0';
+        description = 'A test plugin';
+        install = vi.fn();
+        start = vi.fn().mockResolvedValue(undefined);
+      }
+
+      const mockPlugin = new TestPlugin();
 
       await pluginManager.installPlugins([mockPlugin]);
 
       expect(pluginManager.getPlugins()).toContain(mockPlugin);
-      expect(mockPlugin.install).toHaveBeenCalledWith(mockApp,{});
-      expect(mockPlugin.start).toHaveBeenCalledWith(mockApp,{});
+      expect(mockPlugin.install).toHaveBeenCalledWith(mockApp, {});
+      expect(mockPlugin.start).toHaveBeenCalledWith(mockApp, {});
     });
 
     it('should install multiple plugins', async () => {
-      const plugin1: TokenRingPlugin = {
-        name: 'Plugin1',
-        version: '1.0.0',
-        description: 'First plugin',
-        install: vi.fn(),
-        start: vi.fn().mockResolvedValue(undefined)
-      };
+      class Plugin1 {
+        readonly name = 'Plugin1';
+        version = '1.0.0';
+        description = 'First plugin';
+        install = vi.fn();
+        start = vi.fn().mockResolvedValue(undefined);
+      }
 
-      const plugin2: TokenRingPlugin = {
-        name: 'Plugin2',
-        version: '1.0.0',
-        description: 'Second plugin',
-        install: vi.fn(),
-        start: vi.fn().mockResolvedValue(undefined)
-      };
+      class Plugin2 {
+        readonly name = 'Plugin2';
+        version = '1.0.0';
+        description = 'Second plugin';
+        install = vi.fn();
+        start = vi.fn().mockResolvedValue(undefined);
+      }
+
+      const plugin1 = new Plugin1();
+      const plugin2 = new Plugin2();
 
       await pluginManager.installPlugins([plugin1, plugin2]);
 
@@ -97,79 +91,82 @@ describe('PluginManager', () => {
     });
 
     it('should handle plugins without optional install method', async () => {
-      const plugin: TokenRingPlugin = {
-        name: 'MinimalPlugin',
-        version: '1.0.0',
-        description: 'Minimal plugin',
-        start: vi.fn().mockResolvedValue(undefined)
-        // No install method
-      };
+      class MinimalPlugin {
+        readonly name = 'MinimalPlugin';
+        version = '1.0.0';
+        description = 'Minimal plugin';
+        start = vi.fn().mockResolvedValue(undefined);
+      }
+
+      const plugin = new MinimalPlugin();
 
       await pluginManager.installPlugins([plugin]);
 
       expect(pluginManager.getPlugins()).toContain(plugin);
-      expect(plugin.start).toHaveBeenCalledWith(mockApp,{});
+      expect(plugin.start).toHaveBeenCalledWith(mockApp, {});
     });
 
     it('should handle plugins without optional start method', async () => {
-      const plugin: TokenRingPlugin = {
-        name: 'NoStartPlugin',
-        version: '1.0.0',
-        description: 'Plugin without start',
-        install: vi.fn()
-        // No start method
-      };
+      class NoStartPlugin {
+        readonly name = 'NoStartPlugin';
+        version = '1.0.0';
+        description = 'Plugin without start';
+        install = vi.fn();
+      }
+
+      const plugin = new NoStartPlugin();
 
       await pluginManager.installPlugins([plugin]);
 
       expect(pluginManager.getPlugins()).toContain(plugin);
-      expect(plugin.install).toHaveBeenCalledWith(mockApp,{});
+      expect(plugin.install).toHaveBeenCalledWith(mockApp, {});
     });
 
     it('should handle plugins with neither install nor start methods', async () => {
-      const plugin: TokenRingPlugin = {
-        name: 'EmptyPlugin',
-        version: '1.0.0',
-        description: 'Empty plugin'
-        // No optional methods
-      };
+      class EmptyPlugin {
+        readonly name = 'EmptyPlugin';
+        version = '1.0.0';
+        description = 'Empty plugin';
+      }
+
+      const plugin = new EmptyPlugin();
 
       await pluginManager.installPlugins([plugin]);
 
       expect(pluginManager.getPlugins()).toContain(plugin);
     });
 
-    it('should throw error during install phase', async () => {
-      const installError = new Error('Install failed');
-      const plugin: TokenRingPlugin = {
-        name: 'FailingPlugin',
-        version: '1.0.0',
-        description: 'Failing plugin',
-        install: vi.fn().mockImplementation(() => {
-          throw installError;
-        })
-      };
+    it('should throw error during install phase and not register plugin', async () => {
+      class FailingPlugin {
+        readonly name = 'FailingPlugin';
+        version = '1.0.0';
+        description = 'Failing plugin';
+        install = vi.fn().mockImplementation(() => {
+          throw new Error('Install failed');
+        });
+      }
+
+      const plugin = new FailingPlugin();
 
       await expect(pluginManager.installPlugins([plugin]))
         .rejects.toThrow('Install failed');
 
-
-      // Note: Plugin is registered before install is called, so it will be in the list
-      // This is the actual behavior of the implementation
+      // Plugin should NOT be registered since install failed
       expect(pluginManager.getPlugins()).not.toContain(plugin);
     });
 
-    it('should throw error during start phase', async () => {
-      const startError = new Error('Start failed');
-      const plugin: TokenRingPlugin = {
-        name: 'FailingStartPlugin',
-        version: '1.0.0',
-        description: 'Failing start plugin',
-        install: vi.fn(),
-        start: vi.fn().mockImplementation(() => {
-          throw startError;
-        })
-      };
+    it('should throw error during start phase but keep registered plugin', async () => {
+      class FailingStartPlugin {
+        readonly name = 'FailingStartPlugin';
+        version = '1.0.0';
+        description = 'Failing start plugin';
+        install = vi.fn();
+        start = vi.fn().mockImplementation(() => {
+          throw new Error('Start failed');
+        });
+      }
+
+      const plugin = new FailingStartPlugin();
 
       // Installation should succeed, but start should fail
       await expect(pluginManager.installPlugins([plugin]))
@@ -179,83 +176,89 @@ describe('PluginManager', () => {
       expect(pluginManager.getPlugins()).toContain(plugin);
     });
 
-    it('should log installation errors to console', async () => {
-      const installError = new Error('Install failed');
-      const plugin: TokenRingPlugin = {
-        name: 'FailingPlugin',
-        version: '1.0.0',
-        description: 'Failing plugin',
-        install: vi.fn().mockImplementation(() => {
-          throw installError;
-        })
-      };
+    it('should log installation errors via serviceError', async () => {
+      class FailingPlugin {
+        readonly name = 'FailingPlugin';
+        version = '1.0.0';
+        description = 'Failing plugin';
+        install = vi.fn().mockImplementation(() => {
+          throw new Error('Install failed');
+        });
+      }
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const plugin = new FailingPlugin();
+
+      // Spy on serviceError
+      const serviceErrorSpy = vi.spyOn(mockApp, 'serviceError');
 
       await expect(pluginManager.installPlugins([plugin]))
         .rejects.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error installing plugin "FailingPlugin":',
-        installError
+      // Verify error was logged via serviceError
+      expect(serviceErrorSpy).toHaveBeenCalledWith(
+        pluginManager,
+        expect.stringContaining('Error installing plugin "FailingPlugin"'),
+        expect.any(Error)
       );
-
-      consoleSpy.mockRestore();
     });
 
-    it('should log start errors to console', async () => {
-      const startError = new Error('Start failed');
-      const plugin: TokenRingPlugin = {
-        name: 'FailingStartPlugin',
-        version: '1.0.0',
-        description: 'Failing start plugin',
-        install: vi.fn(),
-        start: vi.fn().mockImplementation(() => {
-          throw startError;
-        })
-      };
+    it('should log start errors via serviceError', async () => {
+      class FailingStartPlugin {
+        readonly name = 'FailingStartPlugin';
+        version = '1.0.0';
+        description = 'Failing start plugin';
+        install = vi.fn();
+        start = vi.fn().mockImplementation(() => {
+          throw new Error('Start failed');
+        });
+      }
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const plugin = new FailingStartPlugin();
 
-      // This should succeed in installation but fail on start
+      // Spy on serviceError
+      const serviceErrorSpy = vi.spyOn(mockApp, 'serviceError');
+
       await expect(pluginManager.installPlugins([plugin]))
         .rejects.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error starting plugin "FailingStartPlugin":',
-        startError
+      // Verify error was logged via serviceError
+      expect(serviceErrorSpy).toHaveBeenCalledWith(
+        pluginManager,
+        expect.stringContaining('Error starting plugin "FailingStartPlugin"'),
+        expect.any(Error)
       );
-
-      consoleSpy.mockRestore();
     });
 
     it('should process install phase before start phase', async () => {
       const installCalls: string[] = [];
       const startCalls: string[] = [];
 
-      const plugin1: TokenRingPlugin = {
-        name: 'Plugin1',
-        version: '1.0.0',
-        description: 'First plugin',
-        install: vi.fn().mockImplementation(() => {
+      class Plugin1 {
+        readonly name = 'Plugin1';
+        version = '1.0.0';
+        description = 'First plugin';
+        install = vi.fn().mockImplementation(() => {
           installCalls.push('Plugin1');
-        }),
-        start: vi.fn().mockImplementation(async () => {
+        });
+        start = vi.fn().mockImplementation(async () => {
           startCalls.push('Plugin1');
-        })
-      };
+        });
+      }
 
-      const plugin2: TokenRingPlugin = {
-        name: 'Plugin2',
-        version: '1.0.0',
-        description: 'Second plugin',
-        install: vi.fn().mockImplementation(() => {
+      class Plugin2 {
+        readonly name = 'Plugin2';
+        version = '1.0.0';
+        description = 'Second plugin';
+        install = vi.fn().mockImplementation(() => {
           installCalls.push('Plugin2');
-        }),
-        start: vi.fn().mockImplementation(async () => {
+        });
+        start = vi.fn().mockImplementation(async () => {
           startCalls.push('Plugin2');
-        })
-      };
+        });
+      }
+
+      const plugin1 = new Plugin1();
+      const plugin2 = new Plugin2();
 
       await pluginManager.installPlugins([plugin1, plugin2]);
 
@@ -267,6 +270,7 @@ describe('PluginManager', () => {
 
   describe('Plugin Access', () => {
     beforeEach(() => {
+      mockApp = createTestingApp();
       pluginManager = new PluginManager(mockApp);
     });
 
@@ -275,11 +279,13 @@ describe('PluginManager', () => {
     });
 
     it('should return installed plugins', async () => {
-      const plugin: TokenRingPlugin = {
-        name: 'TestPlugin',
-        version: '1.0.0',
-        description: 'Test plugin'
-      };
+      class TestPlugin {
+        readonly name = 'TestPlugin';
+        version = '1.0.0';
+        description = 'Test plugin';
+      }
+
+      const plugin = new TestPlugin();
 
       await pluginManager.installPlugins([plugin]);
       const plugins = pluginManager.getPlugins();
