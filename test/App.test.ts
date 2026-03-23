@@ -9,7 +9,7 @@ describe('TokenRingApp', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    app = createTestingApp()
+    app = createTestingApp();
   });
 
   afterEach(() => {
@@ -25,8 +25,8 @@ describe('TokenRingApp', () => {
 
       app.addServices(mockService);
       
-      // Verify that addServices was called
-      expect(app.addServices).toBeDefined();
+      // Verify service was added
+      expect(app.getServices()).toContain(mockService);
     });
 
     it('should provide service access methods', () => {

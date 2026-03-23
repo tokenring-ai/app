@@ -4,6 +4,7 @@ import PluginManager from '../PluginManager';
 import StateManager from '../StateManager';
 import TokenRingApp from '../TokenRingApp';
 import type {TokenRingPlugin, TokenRingService} from '../types';
+import createTestingApp from './createTestingApp';
 
 describe('App Integration Tests', () => {
   let app: TokenRingApp;
@@ -12,7 +13,7 @@ describe('App Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    app = new TokenRingApp('/test/app', { env: 'test' }, { env: 'development' });
+    app = createTestingApp();
     pluginManager = new PluginManager(app);
   });
 
@@ -30,19 +31,21 @@ describe('App Integration Tests', () => {
       const installCalls: string[] = [];
       const startCalls: string[] = [];
 
-      const testPlugin: TokenRingPlugin = {
-        name: 'IntegrationTestPlugin',
-        version: '1.0.0',
-        description: 'Integration test plugin',
-        install: (app) => {
+      class TestPlugin implements TokenRingPlugin<undefined> {
+        readonly name = 'IntegrationTestPlugin';
+        version = '1.0.0';
+        description = 'Integration test plugin';
+        install = (app: TokenRingApp) => {
           installCalls.push('install');
           expect(app).toBe(app);
-        },
-        start: async (app) => {
+        };
+        start = async (app: TokenRingApp) => {
           startCalls.push('start');
           expect(app).toBe(app);
-        }
-      };
+        };
+      }
+
+      const testPlugin = new TestPlugin();
 
       await pluginManager.installPlugins([testPlugin]);
 
@@ -52,35 +55,43 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle multiple plugins with different lifecycle requirements', async () => {
-      const plugin1: TokenRingPlugin = {
-        name: 'Plugin1',
-        version: '1.0.0',
-        description: 'First plugin',
-        install: (app) => {
-          app.serviceOutput('Plugin1 installed');
-        }
-      };
+      // Create fresh pluginManager for this test
+      app = createTestingApp();
+      pluginManager = new PluginManager(app);
 
-      const plugin2: TokenRingPlugin = {
-        name: 'Plugin2',
-        version: '1.0.0',
-        description: 'Second plugin',
-        start: async (app) => {
-          app.serviceOutput('Plugin2 started');
-        }
-      };
+      class Plugin1 implements TokenRingPlugin<undefined> {
+        readonly name = 'Plugin1';
+        version = '1.0.0';
+        description = 'First plugin';
+        install = (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Plugin1 installed');
+        };
+      }
 
-      const plugin3: TokenRingPlugin = {
-        name: 'Plugin3',
-        version: '1.0.0',
-        description: 'Third plugin',
-        install: (app) => {
-          app.serviceOutput('Plugin3 installed');
-        },
-        start: async (app) => {
-          app.serviceOutput('Plugin3 started');
-        }
-      };
+      class Plugin2 implements TokenRingPlugin<undefined> {
+        readonly name = 'Plugin2';
+        version = '1.0.0';
+        description = 'Second plugin';
+        start = async (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Plugin2 started');
+        };
+      }
+
+      class Plugin3 implements TokenRingPlugin<undefined> {
+        readonly name = 'Plugin3';
+        version = '1.0.0';
+        description = 'Third plugin';
+        install = (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Plugin3 installed');
+        };
+        start = async (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Plugin3 started');
+        };
+      }
+
+      const plugin1 = new Plugin1();
+      const plugin2 = new Plugin2();
+      const plugin3 = new Plugin3();
 
       await pluginManager.installPlugins([plugin1, plugin2, plugin3]);
 
@@ -187,29 +198,38 @@ describe('App Integration Tests', () => {
 
   describe('Complete Application Workflow', () => {
     it('should orchestrate full app lifecycle', async () => {
-      const service1: TokenRingService = {
-        name: 'Service1',
-        description: 'First service',
-        run: vi.fn().mockResolvedValue(undefined)
-      };
+      // Create fresh app and pluginManager for this test
+      app = createTestingApp();
+      pluginManager = new PluginManager(app);
 
-      const service2: TokenRingService = {
-        name: 'Service2',
-        description: 'Second service',
-        run: vi.fn().mockResolvedValue(undefined)
-      };
+      class Service1 implements TokenRingService {
+        readonly name = 'Service1';
+        description = 'First service';
+        run = vi.fn().mockResolvedValue(undefined);
+      }
 
-      const plugin: TokenRingPlugin = {
-        name: 'WorkflowPlugin',
-        version: '1.0.0',
-        description: 'Workflow plugin',
-        install: (app) => {
-          app.serviceOutput('Plugin installed in workflow');
-        },
-        start: async (app) => {
-          app.serviceOutput('Plugin started in workflow');
-        }
-      };
+      class Service2 implements TokenRingService {
+        readonly name = 'Service2';
+        description = 'Second service';
+        run = vi.fn().mockResolvedValue(undefined);
+      }
+
+      const service1 = new Service1();
+      const service2 = new Service2();
+
+      class WorkflowPlugin implements TokenRingPlugin<undefined> {
+        readonly name = 'WorkflowPlugin';
+        version = '1.0.0';
+        description = 'Workflow plugin';
+        install = (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Plugin installed in workflow');
+        };
+        start = async (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Plugin started in workflow');
+        };
+      }
+
+      const plugin = new WorkflowPlugin();
 
       // Add services
       app.addServices(service1, service2);
@@ -239,17 +259,23 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle service dependencies and order', async () => {
-      const serviceA: TokenRingService = {
-        name: 'ServiceA',
-        description: 'Service A',
-        run: vi.fn().mockImplementation(async () => {})
-      };
+      // Create fresh app for this test
+      app = createTestingApp();
 
-      const serviceB: TokenRingService = {
-        name: 'ServiceB',
-        description: 'Service B',
-        run: vi.fn().mockImplementation(async () => {})
-      };
+      class ServiceA implements TokenRingService {
+        readonly name = 'ServiceA';
+        description = 'Service A';
+        run = vi.fn().mockImplementation(async () => {});
+      }
+
+      class ServiceB implements TokenRingService {
+        readonly name = 'ServiceB';
+        description = 'Service B';
+        run = vi.fn().mockImplementation(async () => {});
+      }
+
+      const serviceA = new ServiceA();
+      const serviceB = new ServiceB();
 
       app.addServices(serviceA, serviceB);
 
@@ -319,11 +345,24 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle configuration across components', () => {
-      const config = { database: { url: 'default://url' }, logging: { level: 'info' } };
+      const config = { 
+        app: {
+          dataDirectory: '/tmp',
+          configFileName: 'config',
+          configSchema: {} as any,
+        },
+        database: { url: 'default://url' }, 
+        logging: { level: 'info' } 
+      };
 
-      const appWithConfig = new TokenRingApp('/test/app', config);
+      const appWithConfig = new TokenRingApp(config);
 
       expect(appWithConfig.config).toEqual({
+        app: {
+          dataDirectory: '/tmp',
+          configFileName: 'config',
+          configSchema: {} as any,
+        },
         database: { url: 'default://url' },
         logging: { level: 'info' }
       });
@@ -331,17 +370,24 @@ describe('App Integration Tests', () => {
       // Plugin manager should work with configured app
       const pluginManagerWithConfig = new PluginManager(appWithConfig);
 
-      const testPlugin: TokenRingPlugin = {
-        name: 'ConfigTestPlugin',
-        version: '1.0.0',
-        description: 'Config test plugin',
-        install: (app) => {
+      class ConfigTestPlugin implements TokenRingPlugin<undefined> {
+        readonly name = 'ConfigTestPlugin';
+        version = '1.0.0';
+        description = 'Config test plugin';
+        install = (app: TokenRingApp) => {
           expect(app.config).toEqual({
+            app: {
+              dataDirectory: '/tmp',
+              configFileName: 'config',
+              configSchema: {} as any,
+            },
             database: { url: 'default://url' },
             logging: { level: 'info' }
           });
-        }
-      };
+        };
+      }
+
+      const testPlugin = new ConfigTestPlugin();
 
       return pluginManagerWithConfig.installPlugins([testPlugin]);
     });
@@ -361,30 +407,33 @@ describe('App Integration Tests', () => {
       app.addServices(errorService);
       await Promise.all([
         app.run(),
-        await setTimeout(100).then(() => app.shutdown())
+        setTimeout(100).then(() => app.shutdown())
       ]);
 
       expect(errorService.run).toHaveBeenCalled();
     });
 
     it('should handle plugin installation errors without breaking app', async () => {
-      const failingPlugin: TokenRingPlugin = {
-        name: 'FailingPlugin',
-        version: '1.0.0',
-        description: 'Plugin that fails to install',
-        install: () => {
+      class FailingPlugin implements TokenRingPlugin<undefined> {
+        readonly name = 'FailingPlugin';
+        version = '1.0.0';
+        description = 'Plugin that fails to install';
+        install = () => {
           throw new Error('Plugin installation failed');
-        }
-      };
+        };
+      }
 
-      const workingPlugin: TokenRingPlugin = {
-        name: 'WorkingPlugin',
-        version: '1.0.0',
-        description: 'Working plugin',
-        install: (app) => {
-          app.serviceOutput('Working plugin installed');
-        }
-      };
+      class WorkingPlugin implements TokenRingPlugin<undefined> {
+        readonly name = 'WorkingPlugin';
+        version = '1.0.0';
+        description = 'Working plugin';
+        install = (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Working plugin installed');
+        };
+      }
+
+      const failingPlugin = new FailingPlugin();
+      const workingPlugin = new WorkingPlugin();
 
       // Should throw on first plugin failure
       await expect(pluginManager.installPlugins([failingPlugin]))
@@ -401,32 +450,40 @@ describe('App Integration Tests', () => {
     });
 
     it('should handle concurrent operations', async () => {
-      const concurrentPlugin1: TokenRingPlugin = {
-        name: 'ConcurrentPlugin1',
-        version: '1.0.0',
-        description: 'First concurrent plugin',
-        install: (app) => {
-          app.serviceOutput('Concurrent plugin 1 installed');
-        }
-      };
+      // Create fresh app and pluginManager for this test
+      app = createTestingApp();
+      pluginManager = new PluginManager(app);
 
-      const concurrentPlugin2: TokenRingPlugin = {
-        name: 'ConcurrentPlugin2',
-        version: '1.0.0',
-        description: 'Second concurrent plugin',
-        install: (app) => {
-          app.serviceOutput('Concurrent plugin 2 installed');
-        }
-      };
+      class ConcurrentPlugin1 implements TokenRingPlugin<undefined> {
+        readonly name = 'ConcurrentPlugin1';
+        version = '1.0.0';
+        description = 'First concurrent plugin';
+        install = (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Concurrent plugin 1 installed');
+        };
+      }
 
-      const concurrentPlugin3: TokenRingPlugin = {
-        name: 'ConcurrentPlugin3',
-        version: '1.0.0',
-        description: 'Third concurrent plugin',
-        install: (app) => {
-          app.serviceOutput('Concurrent plugin 3 installed');
-        }
-      };
+      class ConcurrentPlugin2 implements TokenRingPlugin<undefined> {
+        readonly name = 'ConcurrentPlugin2';
+        version = '1.0.0';
+        description = 'Second concurrent plugin';
+        install = (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Concurrent plugin 2 installed');
+        };
+      }
+
+      class ConcurrentPlugin3 implements TokenRingPlugin<undefined> {
+        readonly name = 'ConcurrentPlugin3';
+        version = '1.0.0';
+        description = 'Third concurrent plugin';
+        install = (app: TokenRingApp) => {
+          app.serviceOutput(this, 'Concurrent plugin 3 installed');
+        };
+      }
+
+      const concurrentPlugin1 = new ConcurrentPlugin1();
+      const concurrentPlugin2 = new ConcurrentPlugin2();
+      const concurrentPlugin3 = new ConcurrentPlugin3();
 
       await pluginManager.installPlugins([concurrentPlugin1, concurrentPlugin2, concurrentPlugin3]);
 
