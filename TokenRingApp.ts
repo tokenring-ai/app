@@ -2,20 +2,19 @@ import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import {generateHumanId} from "@tokenring-ai/utility/string/generateHumanId";
 import process from "node:process";
-import {setTimeout as setTimeoutPromise} from "timers/promises";
+import {setTimeout as delay} from "timers/promises";
 import {z} from "zod";
+import {AppLogsState} from "./state/AppLogsState.ts";
 import StateManager from "./StateManager.ts";
 import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./types.ts";
-import {AppLogsState} from "./state/AppLogsState.ts";
 
 export const TokenRingAppConfigSchema = z.object({
   app: z.object({
-    //projectDirectory: z.string(),
     dataDirectory: z.string(),
     configFileName: z.string(),
     configSchema: z.custom<z.ZodTypeAny>(),
-    //packageDirectory: z.string(),
-    //hostname: z.string(),
+    shutdownMonitorIntervalMs: z.number().default(2000),
+    serviceRestartDelayMs: z.number().default(5000),
   })
 });
 
@@ -30,9 +29,11 @@ export type LogEntry = {
 
 export default class TokenRingApp {
   private readonly abortController = new AbortController();
+  private shutdownStartedAt?: number;
   readonly sessionId = generateHumanId();
   readonly stateManager = new StateManager<AppStateSlice<any>>();
   readonly runningServices = new Set<TokenRingService>();
+  readonly stoppingServices = new Set<TokenRingService>();
   readonly backgroundTasks = new Map<TokenRingService, number>();
 
   constructor(readonly config: TokenRingAppConfig) {
@@ -62,57 +63,63 @@ export default class TokenRingApp {
     });
   }
 
+  get isShuttingDown(): boolean {
+    return this.abortController.signal.aborted;
+  }
+
+  /**
+   * Initiates a graceful shutdown. Safe to call multiple times.
+   */
   shutdown(reason: string = "App shutdown for unknown reason") {
-    this.abortController.abort(reason);
+    if (!this.abortController.signal.aborted) {
+      this.shutdownStartedAt = Date.now();
+      this.abortController.abort(reason);
+      this.log("info", `[TokenRingApp] Shutting down: ${reason}`);
+    }
+  }
 
-    this.log("info",`[TokenRingApp] Shutting down: ${reason}`);
+  /**
+   * Returns a formatted status string describing what is still
+   * preventing shutdown from completing, or `undefined` if idle.
+   */
+  private describeBlockingWork(): string | undefined {
+    const lines: string[] = [];
 
-    let count = 0;
-    setInterval(() => {
-      count++;
-      const analysis = new Map<TokenRingService, { backgroundTasks: number, running: boolean }>();
-      for (const service of this.runningServices) {
-        analysis.set(service, { backgroundTasks: 0, running: true });
+    for (const service of this.runningServices) {
+      lines.push(`  - ${service.name}: main loop still running`);
+    }
+    for (const service of this.stoppingServices) {
+      lines.push(`  - ${service.name}: stop handler still running`);
+    }
+    for (const [service, count] of this.backgroundTasks) {
+      if (count > 0) {
+        lines.push(`  - ${service.name}: ${count} background task(s) pending`);
       }
-      for (const [service, count] of this.backgroundTasks.entries()) {
-        if (count > 0) {
-          const entry = analysis.get(service) ?? {backgroundTasks: 0, running: false};
-          analysis.set(service, {backgroundTasks: count, running: entry.running});
-        }
-      }
+    }
 
-      if (analysis.size === 0) {
-        //process.stdout.write(`App shutdown complete\n`);
-        process.exit(0);
-      }
+    if (lines.length === 0) return undefined;
 
-      if (count % 4 === 0) {
-        process.stdout.write(`
-App shutdown in progress: ${count * 0.5}s...
-Services still running:
-${Array.from(analysis.entries()).map(([service, {backgroundTasks, running}]) =>
-          `- ${service.name}: Main thread ${running ? "running" : "complete"} ${backgroundTasks} background tasks running`
-        ).join("\n")}
-`.trimStart());
-      }
-    }, 500);
+    const elapsed = this.shutdownStartedAt
+      ? ((Date.now() - this.shutdownStartedAt) / 1000).toFixed(1)
+      : "?";
 
-    /*
-    //TODO: Figure out what is making the event loop hang.
-    const hungServiceTimer = setTimeout(() => {
-      if (this.runningServices.size === 0 && this.backgroundTasks.size === 0) {
-        process.stdout.write(`[TokenRingApp] Has not shut down for 15s, and the task hanging the event loop was not registered with TokenRingApp\n`);
-        return;
-      }
-      for (const service of this.runningServices.values()) {
-        process.stdout.write(`[${service.name}] Has not shut down for 15s...\n`);
-      }
+    return `App shutdown in progress (${elapsed}s):\n${lines.join("\n")}\n`;
+  }
 
-      for (const [service, count] of this.backgroundTasks.entries()) {
-        process.stdout.write(`[${service.name}] Has ${count} background tasks running, which are preventing the shutdown from completing...\n`);
+  /**
+   * Periodically logs shutdown progress until the returned
+   * cleanup function is called.
+   */
+  private startShutdownMonitor(): () => void {
+    const timer = setInterval(() => {
+      const status = this.describeBlockingWork();
+      if (status) {
+        process.stdout.write(status);
       }
-    }, 15000);
-    hungServiceTimer.unref();*/
+    }, this.config.app.shutdownMonitorIntervalMs);
+    timer.unref?.();
+
+    return () => clearInterval(timer);
   }
 
   generateStateCheckpoint() {
@@ -121,55 +128,86 @@ ${Array.from(analysis.entries()).map(([service, {backgroundTasks, running}]) =>
 
   restoreState(state: AppSessionCheckpoint["state"]) {
     this.stateManager.deserialize(state, (key) => {
-      this.log("info",`[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`);
+      this.log("info", `[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`);
     });
   }
 
 
   async run() {
     const signal = this.abortController.signal;
-    await Promise.all([
-      ...this.services.getItems().map(async (service) => {
+    let runError: unknown;
+    try {
+      for (const service of this.services.getItems()) {
         if (service.start) {
           await service.start(signal);
         }
-      })
-    ])
+      }
 
-    await Promise.all([
-      ...this.services.getItems().map(async (service) => {
-        if (!service.run) return;
-        this.runningServices.add(service);
-
-        while (!signal.aborted) {
-          try {
-            await service.run(signal);
-            // If run() completes without error but we aren't aborted, it exited "normally"
-            if (!signal.aborted) {
-              this.serviceError(service,`Exited unexpectedly. Restarting in 5s...`);
-            }
-          } catch (err) {
-            if (!signal.aborted) {
-              this.serviceError(service,`Died with error:`, err, "Restarting in 5s...");
-            }
-          }
-
-          if (signal.aborted) break;
-          await setTimeoutPromise(5000, null, {signal}).catch(err => null);
-        }
-        this.runningServices.delete(service);
-      }),
-    ]);
-
-    await Promise.all([
-      ...this.services.getItems().map(async (service) => {
-        if (service.stop) {
+      await Promise.all(
+        this.services.getItems().map(async (service) => {
+          if (!service.run) return;
           this.runningServices.add(service);
-          await service.stop();
-          this.runningServices.delete(service);
+
+          try {
+            while (!signal.aborted) {
+              try {
+                await service.run(signal);
+                // If run() completes without error but we aren't aborted, it exited "normally"
+                if (!signal.aborted) {
+                  this.serviceError(service, `Exited unexpectedly. Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
+                }
+              } catch (err) {
+                if (!signal.aborted) {
+                  this.serviceError(service, `Died with error:`, err, `Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
+                }
+              }
+
+              if (signal.aborted) break;
+              await delay(this.config.app.serviceRestartDelayMs, null, {signal}).catch(() => null);
+            }
+          } finally {
+            this.runningServices.delete(service);
+          }
+        }),
+      );
+    } catch (err) {
+      runError = err;
+      this.shutdown(err instanceof Error ? err.message : "App run failed");
+    } finally {
+      this.shutdown(signal.reason && typeof signal.reason === "string" ? signal.reason : "App shutdown");
+
+      const stopShutdownMonitor = this.startShutdownMonitor();
+      try {
+        const stopResults = await Promise.allSettled(
+          this.services.getItems().map(async (service) => {
+            if (!service.stop) return;
+
+            this.stoppingServices.add(service);
+            try {
+              await service.stop();
+            } finally {
+              this.stoppingServices.delete(service);
+            }
+          })
+        );
+
+        const stopErrors = stopResults
+          .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+          .map(result => result.reason);
+
+        if (runError) {
+          throw runError;
         }
-      })
-    ])
+        if (stopErrors.length === 1) {
+          throw stopErrors[0];
+        }
+        if (stopErrors.length > 1) {
+          throw new AggregateError(stopErrors, "Multiple services failed to stop cleanly");
+        }
+      } finally {
+        stopShutdownMonitor();
+      }
+    }
   }
 
   waitForService = <R extends TokenRingService>(

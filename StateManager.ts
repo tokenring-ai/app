@@ -42,13 +42,15 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
   initializeState<S, T extends SpecificStateSliceType>(
     ClassType: new (props: S) => T,
     props: S,
-  ): void {
+  ): T {
     const slice = new ClassType(props)
     this.state.set(ClassType, slice);
 
     if (Object.hasOwn(this.startingState, slice.name)) {
       slice.deserialize(slice.serializationSchema.parse(this.startingState[slice.name]));
     }
+
+    return slice;
   }
 
   mutateState<R, T extends SpecificStateSliceType>(

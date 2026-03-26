@@ -1,4 +1,4 @@
-import {setTimeout} from "timers/promises";
+import {setTimeout as delay} from "timers/promises";
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import PluginManager from '../PluginManager';
 import StateManager from '../StateManager';
@@ -178,7 +178,7 @@ describe('App Integration Tests', () => {
       const callback = vi.fn();
       const unsubscribe = stateManager.subscribe(TestStateSlice, callback);
 
-      await setTimeout(20);
+      await delay(20);
 
       // Initial call should happen
       expect(callback).toHaveBeenCalledWith(stateManager.getState(TestStateSlice));
@@ -241,7 +241,7 @@ describe('App Integration Tests', () => {
       const runPromise = app.run();
 
       // Wait for services to initialize
-      await setTimeout(20);
+      await delay(20);
 
       // Shutdown
       app.shutdown();
@@ -281,7 +281,7 @@ describe('App Integration Tests', () => {
 
       const runPromise = app.run();
 
-      await setTimeout(30);
+      await delay(30);
       app.shutdown();
 
       await runPromise;
@@ -334,7 +334,7 @@ describe('App Integration Tests', () => {
       // Start app
       const runPromise = app.run();
 
-      await setTimeout(20);
+      await delay(20);
 
       // State should persist
       expect(stateManager.getState(AppState).initialized).toBe(true);
@@ -511,7 +511,7 @@ describe('App Integration Tests', () => {
         expect(service.name).toBe("Service2");
       });
 
-      await setTimeout(200);
+      await delay(200);
 
       expect(callbackCalled).toBe(true);
     });

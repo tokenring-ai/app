@@ -1,4 +1,4 @@
-import {setTimeout} from 'timers/promises';
+import {setTimeout as delay} from 'timers/promises';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import TokenRingApp from '../TokenRingApp';
 import type {TokenRingService} from "../types";
@@ -97,7 +97,7 @@ describe('TokenRingApp', () => {
       app.runBackgroundTask(mockService, mockInitiator);
       
       // Wait for the promise to resolve
-      await setTimeout(10);
+      await delay(10);
       
       expect(app.logs).toHaveLength(1);
       expect(app.logs[0].level).toBe('error');
@@ -178,7 +178,7 @@ describe('TokenRingApp', () => {
         name = "MockService1";
         description = "Mock service for testing"
         async run(signal: AbortSignal) {
-          await setTimeout(10000, null, { signal })
+          await delay(10000, null, { signal })
         }
       }
 
@@ -203,6 +203,55 @@ describe('TokenRingApp', () => {
 
       expect(mockService1.run).toHaveBeenCalled();
       expect(mockService2.run).toHaveBeenCalled();
+    });
+
+    it('should stop services before surfacing shutdown errors', async () => {
+      const lifecycleEvents: string[] = [];
+
+      class MockService implements TokenRingService {
+        name = "MockService";
+        description = "Mock service for testing";
+
+        async run(signal: AbortSignal) {
+          await delay(10000, null, {signal}).catch(() => {});
+        }
+
+        async stop() {
+          lifecycleEvents.push("stop");
+          throw new Error("Stop failed");
+        }
+      }
+
+      app.addServices(new MockService());
+
+      const runPromise = app.run();
+      await delay(20);
+      app.shutdown();
+
+      await expect(runPromise).rejects.toThrow("Stop failed");
+      expect(lifecycleEvents).toEqual(["stop"]);
+    });
+
+    it('should stop services after startup failures', async () => {
+      const stop = vi.fn();
+
+      class MockService implements TokenRingService {
+        name = "MockService";
+        description = "Mock service for testing";
+
+        async start() {
+          throw new Error("Start failed");
+        }
+
+        async stop() {
+          stop();
+        }
+      }
+
+      app.addServices(new MockService());
+
+      await expect(app.run()).rejects.toThrow("Start failed");
+      expect(stop).toHaveBeenCalledTimes(1);
     });
   });
 
