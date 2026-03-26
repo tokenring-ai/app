@@ -43,7 +43,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     ClassType: new (props: S) => T,
     props: S,
   ): T {
-    const slice = new ClassType(props)
+    const slice = new ClassType(props);
     this.state.set(ClassType, slice);
 
     if (Object.hasOwn(this.startingState, slice.name)) {
@@ -113,7 +113,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
     queueMicrotask(() => {
       if (this.subscribers.get(ClassType)?.has(callback)) {
-        callback(this.getState(ClassType))
+        callback(this.getState(ClassType));
       }
     });
 
@@ -187,7 +187,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
     // Subscribe to state changes
     const unsubscribe = this.subscribe(ClassType, (state) => {
-      latestItem = state
+      latestItem = state;
       if (resolveNext) {
         resolveNext();
         resolveNext = null;

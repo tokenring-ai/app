@@ -123,7 +123,7 @@ export default class TokenRingApp {
   }
 
   generateStateCheckpoint() {
-    return this.stateManager.serialize()
+    return this.stateManager.serialize();
   }
 
   restoreState(state: AppSessionCheckpoint["state"]) {
@@ -220,12 +220,12 @@ export default class TokenRingApp {
    */
   serviceOutput(service: TokenRingService, ...messages: any[]): void {
     const message = `[${service.name}] ${formatLogMessages(messages)}`;
-    this.log("info", message)
+    this.log("info", message);
   }
 
   serviceError(service: TokenRingService, ...messages: any[]): void {
     const message = `[${service.name}] ${formatLogMessages(messages)}`;
-    this.log("error", message)
+    this.log("error", message);
   }
 
   /*
