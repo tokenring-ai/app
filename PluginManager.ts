@@ -1,5 +1,5 @@
 import deepEquals from "@tokenring-ai/utility/object/deepEquals";
-import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
+import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import {ZodObject} from "zod";
 import TokenRingApp, {type TokenRingAppConfig} from "./TokenRingApp";
 import type {TokenRingPlugin, TokenRingService} from "./types";
@@ -8,9 +8,9 @@ export default class PluginManager implements TokenRingService {
   readonly name = "PluginManager";
   description = "Manages plugins";
 
-  private plugins = new TypedRegistry<TokenRingPlugin<ZodObject>>();
+  private plugins = new KeyedRegistry<TokenRingPlugin<ZodObject>>();
 
-  getPlugins = () => this.plugins.getItems();
+  getPlugins = this.plugins.getAllItemValues;
 
   constructor(private readonly app: TokenRingApp) {
     this.app.addServices(this);
@@ -20,8 +20,8 @@ export default class PluginManager implements TokenRingService {
     for (const plugin of plugins) {
       try {
         this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-        if (plugin.install) plugin.install(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
-        this.plugins.register(plugin);
+        if (plugin.install) await plugin.install(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+        this.plugins.register(plugin.name, plugin);
       } catch (error) {
         this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
         throw error;
@@ -42,7 +42,7 @@ export default class PluginManager implements TokenRingService {
   async reconfigurePlugins(newConfig: TokenRingAppConfig): Promise<{ restartRequired: boolean }> {
     let restartRequired = false;
 
-    const plugins = this.plugins.getItems();
+    const plugins = this.plugins.getAllItemValues();
     for (const plugin of plugins) {
       const hasConfig = 'config' in plugin;
       if (hasConfig) {
