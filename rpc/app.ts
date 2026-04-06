@@ -9,6 +9,7 @@ export default createRPCEndpoint(AppRpcSchema, {
     return {
       plugins: pluginManager.getPlugins().map(p => ({
         name: p.name,
+        displayName: p.displayName,
         version: p.version,
         description: p.description,
         hasConfig: 'config' in p,

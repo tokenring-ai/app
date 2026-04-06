@@ -4,22 +4,10 @@ import {generateHumanId} from "@tokenring-ai/utility/string/generateHumanId";
 import process from "node:process";
 import {setTimeout as delay} from "timers/promises";
 import {z} from "zod";
+import type {TokenRingAppConfig} from "./schema.ts";
 import {AppLogsState} from "./state/AppLogsState.ts";
 import StateManager from "./StateManager.ts";
 import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./types.ts";
-
-export const TokenRingAppConfigSchema = z.object({
-  app: z.object({
-    dataDirectory: z.string(),
-    configFileName: z.string(),
-    configSchema: z.custom<z.ZodTypeAny>(),
-    shutdownMonitorIntervalMs: z.number().default(2000),
-    serviceRestartDelayMs: z.number().default(5000),
-  })
-});
-
-export const LooseTokenRingAppConfigSchema = TokenRingAppConfigSchema.loose();
-export type TokenRingAppConfig = z.output<typeof LooseTokenRingAppConfigSchema>;
 
 export type LogEntry = {
   timestamp: number;

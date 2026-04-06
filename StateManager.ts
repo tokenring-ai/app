@@ -1,18 +1,9 @@
 import {z} from "zod";
 
-export type StateSnapshot = Record<string, unknown>;
-
 export abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> {
   constructor(public readonly name: string, public readonly serializationSchema: SerializationSchema) {}
   abstract serialize(): z.input<SerializationSchema>;
   abstract deserialize(data: z.output<SerializationSchema>): void;
-
-  getValidatedState(stateSnapshot: StateSnapshot): z.output<SerializationSchema> | null {
-    if (Object.hasOwn(stateSnapshot, this.name)) {
-      return this.serializationSchema.parse(stateSnapshot[this.name]);
-    }
-    return null;
-  }
 }
 
 export interface StateStorageInterface<SpecificStateSliceType extends SerializableStateSlice<any>> {
@@ -34,10 +25,6 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
   private subscribers = new Map<new (...args: any[]) => SpecificStateSliceType, Set<(state: any) => void>>();
 
   constructor(private startingState: Record<string, unknown> = {}) {}
-
-  setStartingState(state: Record<string, unknown>) {
-    this.startingState = state;
-  }
 
   initializeState<S, T extends SpecificStateSliceType>(
     ClassType: new (props: S) => T,

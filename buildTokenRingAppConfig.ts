@@ -2,7 +2,7 @@ import deepMerge from "@tokenring-ai/utility/object/deepMerge";
 import fs from "node:fs";
 import path from "path";
 import {z} from "zod";
-import {TokenRingAppConfigSchema} from "./TokenRingApp.ts";
+import type {TokenRingAppConfigSchema} from "./schema.ts";
 
 export default async function buildTokenRingAppConfig<
   T extends z.ZodTypeAny
@@ -15,7 +15,7 @@ export default async function buildTokenRingAppConfig<
   const gitIgnoreFile = path.resolve(dataDirectory, ".gitignore");
   if (!fs.existsSync(gitIgnoreFile)) {
     fs.writeFileSync(gitIgnoreFile, "*.sqlite*\n");
-  }
+}
 
   const possibleConfigExtensions = ["ts", "mjs", "cjs", "js"];
 

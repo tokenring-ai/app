@@ -6,22 +6,26 @@ import TokenRingApp from "./TokenRingApp.ts";
 
 export type TokenRingPlugin<ConfigType> = {
   readonly name: string;
-  version: string;
-  description: string;
-  install?: (app: TokenRingApp) => Promise<void> | void | undefined; // Install does not allow awaiting, anything awaited must be done in start
+  readonly displayName: string;
+  readonly version: string;
+  readonly description: string;
+  earlyInstall?: (app: TokenRingApp) => Promise<void> | void;
+  install?: (app: TokenRingApp) => Promise<void|undefined> | void | undefined; // Install does not allow awaiting, anything awaited must be done in start
   start?: (app: TokenRingApp) => Promise<void> | void;
 } | {
   readonly name: string;
-  version: string;
-  description: string;
-  config: ConfigType;
-  install?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void | undefined; // Install does not allow awaiting, anything awaited must be done in start
+  readonly displayName: string;
+  readonly version: string;
+  readonly description: string;
+  readonly config: ConfigType;
+  earlyInstall?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
+  install?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void|undefined> | void | undefined; // Install does not allow awaiting, anything awaited must be done in start
   start?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
   reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
 };
 export interface TokenRingService {
   readonly name: string;
-  description: string;
+  readonly description: string;
   run?(signal: AbortSignal): Promise<void>;
   start?(signal: AbortSignal): Promise<void> | void;
   stop?(): Promise<void> | void;

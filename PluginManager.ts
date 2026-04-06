@@ -1,7 +1,8 @@
 import deepEquals from "@tokenring-ai/utility/object/deepEquals";
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import {ZodObject} from "zod";
-import TokenRingApp, {type TokenRingAppConfig} from "./TokenRingApp";
+import type {TokenRingAppConfig} from "./schema.ts";
+import TokenRingApp from "./TokenRingApp";
 import type {TokenRingPlugin, TokenRingService} from "./types";
 
 export default class PluginManager implements TokenRingService {
@@ -19,8 +20,22 @@ export default class PluginManager implements TokenRingService {
   async installPlugins(plugins: TokenRingPlugin<any>[]): Promise<void> {
     for (const plugin of plugins) {
       try {
-        this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-        if (plugin.install) await plugin.install(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+        if (plugin.earlyInstall) {
+          this.app.serviceOutput(this, `Early Installing plugin "${plugin.name}"`);
+          await plugin.earlyInstall(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+        }
+      } catch (error) {
+        this.app.serviceError(this, `Error early installing plugin "${plugin.name}":`, error);
+        throw error;
+      }
+    }
+
+    for (const plugin of plugins) {
+      try {
+        if (plugin.install) {
+          this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
+          plugin.install(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+        }
         this.plugins.register(plugin.name, plugin);
       } catch (error) {
         this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
@@ -30,8 +45,10 @@ export default class PluginManager implements TokenRingService {
 
     for (const plugin of plugins) {
       try {
-        this.app.serviceOutput(this, `Starting plugin "${plugin.name}"`);
-        if (plugin.start) await plugin.start(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+        if (plugin.start) {
+          this.app.serviceOutput(this, `Starting plugin "${plugin.name}"`);
+          await plugin.start(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+        }
       } catch (error) {
         this.app.serviceError(this, `Error starting plugin "${plugin.name}":`, error);
         throw error;
