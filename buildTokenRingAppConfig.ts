@@ -1,4 +1,5 @@
 import deepMerge from "@tokenring-ai/utility/object/deepMerge";
+import {Glob, YAML} from "bun";
 import fs from "node:fs";
 import path from "path";
 import {z} from "zod";
@@ -7,7 +8,7 @@ import type {TokenRingAppConfigSchema} from "./schema.ts";
 export default async function buildTokenRingAppConfig<
   T extends z.ZodTypeAny
 >(defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): Promise<z.output<T>> {
-  const {dataDirectory, configFileName, configSchema} = defaultConfig.app;
+  const {dataDirectory, configDirectories, configSchema} = defaultConfig.app;
   if (!fs.existsSync(dataDirectory)) {
     fs.mkdirSync(dataDirectory);
   }
@@ -17,21 +18,20 @@ export default async function buildTokenRingAppConfig<
     fs.writeFileSync(gitIgnoreFile, "*.sqlite*\n");
 }
 
-  const possibleConfigExtensions = ["ts", "mjs", "cjs", "js"];
+  const glob = new Glob("**/*.yaml")
 
   let mergedConfig = defaultConfig;
   let parsedConfig = configSchema.parse(defaultConfig) as z.output<T>;
 
   // Try each directory and extension in order
-  for (const dir of ["~", dataDirectory]) {
-    for (const ext of possibleConfigExtensions) {
-      const potentialConfig = path.join(dir, `${configFileName}.${ext}`);
-      if (fs.existsSync(potentialConfig)) {
-        const config = await import(potentialConfig);
-        mergedConfig = deepMerge(mergedConfig, config.default ?? config);
-        parsedConfig = configSchema.parse(mergedConfig) as z.output<T>; // We parse the config each time to verify that it is complete and well formed at all steps.
-        break;
-      }
+  for (const dir of configDirectories) {
+    if (! fs.existsSync(dir)) continue;
+    const configs = glob.scanSync({cwd: dir, absolute: true});
+    for (const config of configs) {
+      const configContent = fs.readFileSync(config, "utf-8");
+      const parsedYaml = YAML.parse(configContent) as any;
+      mergedConfig = deepMerge(mergedConfig, parsedYaml);
+      parsedConfig = configSchema.parse(mergedConfig) as z.output<T>;
     }
   }
 

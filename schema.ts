@@ -3,7 +3,7 @@ import z from "zod";
 export const TokenRingAppConfigSchema = z.object({
   app: z.object({
     dataDirectory: z.string(),
-    configFileName: z.string(),
+    configDirectories: z.array(z.string()),
     configSchema: z.custom<z.ZodTypeAny>(),
     shutdownMonitorIntervalMs: z.number().default(2000),
     serviceRestartDelayMs: z.number().default(5000),
