@@ -1,8 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {z} from "zod";
 import PluginManager from '../PluginManager';
 import TokenRingApp from '../TokenRingApp';
-import type {TokenRingPlugin} from '../types';
 import createTestingApp from "./createTestingApp";
 
 describe('PluginManager', () => {

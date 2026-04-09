@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import TokenRingApp from '../TokenRingApp';
 import {AppLogsState} from '../state/AppLogsState';
+import TokenRingApp from '../TokenRingApp';
 
 describe('TokenRingApp Logs State', () => {
   it('should store logs in state manager', () => {
