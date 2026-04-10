@@ -7,7 +7,7 @@ export const TokenRingAppConfigSchema = z.object({
     configSchema: z.custom<z.ZodTypeAny>(),
     shutdownMonitorIntervalMs: z.number().default(2000),
     serviceRestartDelayMs: z.number().default(5000),
-  })
+  }),
 });
 export const LooseTokenRingAppConfigSchema = TokenRingAppConfigSchema.loose();
 export type TokenRingAppConfig = z.output<typeof LooseTokenRingAppConfigSchema>;

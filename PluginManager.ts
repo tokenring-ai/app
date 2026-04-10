@@ -1,15 +1,14 @@
 import deepEquals from "@tokenring-ai/utility/object/deepEquals";
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
-import {ZodObject} from "zod";
 import type {TokenRingAppConfig} from "./schema.ts";
-import TokenRingApp from "./TokenRingApp";
+import type TokenRingApp from "./TokenRingApp";
 import type {TokenRingPlugin, TokenRingService} from "./types";
 
 export default class PluginManager implements TokenRingService {
   readonly name = "PluginManager";
   description = "Manages plugins";
 
-  private plugins = new KeyedRegistry<TokenRingPlugin<ZodObject>>();
+  private plugins = new KeyedRegistry<TokenRingPlugin<any>>();
 
   getPlugins = this.plugins.getAllItemValues;
 
@@ -21,11 +20,21 @@ export default class PluginManager implements TokenRingService {
     for (const plugin of plugins) {
       try {
         if (plugin.earlyInstall) {
-          this.app.serviceOutput(this, `Early Installing plugin "${plugin.name}"`);
-          await plugin.earlyInstall(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+          this.app.serviceOutput(
+            this,
+            `Early Installing plugin "${plugin.name}"`,
+          );
+          await plugin.earlyInstall(
+            this.app,
+            "config" in plugin ? plugin.config.parse(this.app.config) : {},
+          );
         }
       } catch (error) {
-        this.app.serviceError(this, `Error early installing plugin "${plugin.name}":`, error);
+        this.app.serviceError(
+          this,
+          `Error early installing plugin "${plugin.name}":`,
+          error,
+        );
         throw error;
       }
     }
@@ -34,11 +43,18 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.install) {
           this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-          plugin.install(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+          plugin.install(
+            this.app,
+            "config" in plugin ? plugin.config.parse(this.app.config) : {},
+          );
         }
         this.plugins.register(plugin.name, plugin);
       } catch (error) {
-        this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
+        this.app.serviceError(
+          this,
+          `Error installing plugin "${plugin.name}":`,
+          error,
+        );
         throw error;
       }
     }
@@ -47,36 +63,51 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.start) {
           this.app.serviceOutput(this, `Starting plugin "${plugin.name}"`);
-          await plugin.start(this.app, 'config' in plugin ? plugin.config.parse(this.app.config) : {});
+          await plugin.start(
+            this.app,
+            "config" in plugin ? plugin.config.parse(this.app.config) : {},
+          );
         }
       } catch (error) {
-        this.app.serviceError(this, `Error starting plugin "${plugin.name}":`, error);
+        this.app.serviceError(
+          this,
+          `Error starting plugin "${plugin.name}":`,
+          error,
+        );
         throw error;
       }
     }
   }
 
-  async reconfigurePlugins(newConfig: TokenRingAppConfig): Promise<{ restartRequired: boolean }> {
+  async reconfigurePlugins(
+    newConfig: TokenRingAppConfig,
+  ): Promise<{ restartRequired: boolean }> {
     let restartRequired = false;
 
     const plugins = this.plugins.getAllItemValues();
     for (const plugin of plugins) {
-      const hasConfig = 'config' in plugin;
+      const hasConfig = "config" in plugin;
       if (hasConfig) {
         const prevConfigSlice = plugin.config.parse(this.app.config);
         const newConfigSlice = plugin.config.parse(newConfig);
 
-        if (! deepEquals(prevConfigSlice, newConfigSlice)) {
+        if (!deepEquals(prevConfigSlice, newConfigSlice)) {
           if (plugin.reconfigure) {
-            this.app.serviceOutput(this, `Plugin ${plugin.name} was reconfigured`);
+            this.app.serviceOutput(
+              this,
+              `Plugin ${plugin.name} was reconfigured`,
+            );
             await plugin.reconfigure(this.app, newConfigSlice);
           } else {
-            this.app.serviceOutput(this, `Plugin ${plugin.name} does not support reconfiguration`);
+            this.app.serviceOutput(
+              this,
+              `Plugin ${plugin.name} does not support reconfiguration`,
+            );
             restartRequired = true;
           }
         }
       }
     }
-    return { restartRequired };
+    return {restartRequired};
   }
 }

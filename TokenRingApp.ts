@@ -2,12 +2,12 @@ import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import {generateHumanId} from "@tokenring-ai/utility/string/generateHumanId";
 import process from "node:process";
-import {setTimeout as delay} from "timers/promises";
-import {z} from "zod";
+import {setTimeout as delay} from "node:timers/promises";
+import type {z} from "zod";
 import type {TokenRingAppConfig} from "./schema.ts";
 import {AppLogsState} from "./state/AppLogsState.ts";
 import StateManager from "./StateManager.ts";
-import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./types.ts";
+import type {AppSessionCheckpoint, AppStateSlice, TokenRingService,} from "./types.ts";
 
 export type LogEntry = {
   timestamp: number;
@@ -34,6 +34,7 @@ export default class TokenRingApp {
   requireService = this.services.requireItemByType;
   getService = this.services.getItemByType;
   getServices = this.services.getItems;
+
   addServices(...services: TokenRingService[]) {
     this.services.register(...services);
   }
@@ -45,9 +46,12 @@ export default class TokenRingApp {
     return this.stateManager.getState(AppLogsState).getLogs();
   }
 
-  private log(level: "info" | "error", message: string) {
-    this.stateManager.mutateState(AppLogsState, state => {
-      state.addLog(level, message);
+  restoreState(state: AppSessionCheckpoint["state"]) {
+    this.stateManager.deserialize(state, (key) => {
+      this.log(
+        "info",
+        `[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`,
+      );
     });
   }
 
@@ -114,13 +118,6 @@ export default class TokenRingApp {
     return this.stateManager.serialize();
   }
 
-  restoreState(state: AppSessionCheckpoint["state"]) {
-    this.stateManager.deserialize(state, (key) => {
-      this.log("info", `[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`);
-    });
-  }
-
-
   async run() {
     const signal = this.abortController.signal;
     let runError: unknown;
@@ -142,16 +139,26 @@ export default class TokenRingApp {
                 await service.run(signal);
                 // If run() completes without error but we aren't aborted, it exited "normally"
                 if (!signal.aborted) {
-                  this.serviceError(service, `Exited unexpectedly. Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
+                  this.serviceError(
+                    service,
+                    `Exited unexpectedly. Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`,
+                  );
                 }
               } catch (err) {
                 if (!signal.aborted) {
-                  this.serviceError(service, `Died with error:`, err, `Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
+                  this.serviceError(
+                    service,
+                    `Died with error:`,
+                    err,
+                    `Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`,
+                  );
                 }
               }
 
               if (signal.aborted) break;
-              await delay(this.config.app.serviceRestartDelayMs, null, {signal}).catch(() => null);
+              await delay(this.config.app.serviceRestartDelayMs, null, {
+                signal,
+              }).catch(() => null);
             }
           } finally {
             this.runningServices.delete(service);
@@ -162,7 +169,11 @@ export default class TokenRingApp {
       runError = err;
       this.shutdown(err instanceof Error ? err.message : "App run failed");
     } finally {
-      this.shutdown(signal.reason && typeof signal.reason === "string" ? signal.reason : "App shutdown");
+      this.shutdown(
+        signal.reason && typeof signal.reason === "string"
+          ? signal.reason
+          : "App shutdown",
+      );
 
       const stopShutdownMonitor = this.startShutdownMonitor();
       try {
@@ -176,12 +187,15 @@ export default class TokenRingApp {
             } finally {
               this.stoppingServices.delete(service);
             }
-          })
+          }),
         );
 
         const stopErrors = stopResults
-          .filter((result): result is PromiseRejectedResult => result.status === "rejected")
-          .map(result => result.reason);
+          .filter(
+            (result): result is PromiseRejectedResult =>
+              result.status === "rejected",
+          )
+          .map((result) => result.reason);
 
         if (runError) {
           throw runError;
@@ -190,7 +204,10 @@ export default class TokenRingApp {
           throw stopErrors[0];
         }
         if (stopErrors.length > 1) {
-          throw new AggregateError(stopErrors, "Multiple services failed to stop cleanly");
+          throw new AggregateError(
+            stopErrors,
+            "Multiple services failed to stop cleanly",
+          );
         }
       } finally {
         stopShutdownMonitor();
@@ -200,8 +217,25 @@ export default class TokenRingApp {
 
   waitForService = <R extends TokenRingService>(
     serviceType: abstract new (...args: any[]) => R,
-    callback: (service: R) => void
+    callback: (service: R) => void,
   ): void => this.services.waitForItemByType(serviceType, callback);
+
+  /*
+   * Track an app-level promise and log any errors that occur.
+   */
+  runBackgroundTask(
+    service: TokenRingService,
+    initiator: (signal: AbortSignal) => Promise<void>,
+  ): void {
+    const count = this.backgroundTasks.get(service) || 0;
+    this.backgroundTasks.set(service, count + 1);
+    initiator(this.abortController.signal)
+      .catch((err) => this.serviceError(service, "Error:", err))
+      .finally(() => {
+        const count = this.backgroundTasks.get(service) || 0;
+        this.backgroundTasks.set(service, count - 1);
+      });
+  }
 
   /**
    * Log a system message
@@ -216,24 +250,13 @@ export default class TokenRingApp {
     this.log("error", message);
   }
 
-  /*
-   * Track an app-level promise and log any errors that occur.
-   */
-  runBackgroundTask(service: TokenRingService, initiator: (signal: AbortSignal) => Promise<void>) : void {
-    const count = this.backgroundTasks.get(service) || 0;
-    this.backgroundTasks.set(service, count + 1);
-    initiator(this.abortController.signal)
-      .catch((err) => this.serviceError(service,"Error:", err))
-      .finally(() => {
-        const count = this.backgroundTasks.get(service) || 0;
-        this.backgroundTasks.set(service, count - 1);
-      });
-  }
-
   /**
    * Get a config value by key and parse it using the provided schema
    */
-  getConfigSlice<T extends { parse: (any: any) => any}>(key: string, schema: T): z.output<T> {
+  getConfigSlice<T extends { parse: (any: any) => any }>(
+    key: string,
+    schema: T,
+  ): z.output<T> {
     try {
       return schema.parse(this.config[key]) as z.output<T>;
     } catch (error) {
@@ -243,4 +266,9 @@ export default class TokenRingApp {
     }
   }
 
+  private log(level: "info" | "error", message: string) {
+    this.stateManager.mutateState(AppLogsState, (state) => {
+      state.addLog(level, message);
+    });
+  }
 }

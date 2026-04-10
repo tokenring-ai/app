@@ -8,11 +8,13 @@ export interface LogEntry {
 }
 
 const serializationSchema = z.object({
-  logs: z.array(z.object({
-    timestamp: z.number(),
-    level: z.enum(["info", "error"]),
-    message: z.string(),
-  })),
+  logs: z.array(
+    z.object({
+      timestamp: z.number(),
+      level: z.enum(["info", "error"]),
+      message: z.string(),
+    }),
+  ),
 });
 
 export class AppLogsState extends AppStateSlice<typeof serializationSchema> {

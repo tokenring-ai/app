@@ -1,13 +1,13 @@
 import deepMerge from "@tokenring-ai/utility/object/deepMerge";
 import {Glob, YAML} from "bun";
 import fs from "node:fs";
-import path from "path";
-import {z} from "zod";
+import path from "node:path";
+import type {z} from "zod";
 import type {TokenRingAppConfigSchema} from "./schema.ts";
 
-export default function buildTokenRingAppConfig<
-  T extends z.ZodTypeAny
->(defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): z.output<T> {
+export default function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
+  defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>,
+): z.output<T> {
   const {dataDirectory, configDirectories, configSchema} = defaultConfig.app;
   if (!fs.existsSync(dataDirectory)) {
     fs.mkdirSync(dataDirectory);
@@ -16,9 +16,9 @@ export default function buildTokenRingAppConfig<
   const gitIgnoreFile = path.resolve(dataDirectory, ".gitignore");
   if (!fs.existsSync(gitIgnoreFile)) {
     fs.writeFileSync(gitIgnoreFile, "*.sqlite*\n");
-}
+  }
 
-  const glob = new Glob("**/*.yaml")
+  const glob = new Glob("**/*.yaml");
 
   let mergedConfig = defaultConfig;
   let parsedConfig = configSchema.parse(defaultConfig) as z.output<T>;

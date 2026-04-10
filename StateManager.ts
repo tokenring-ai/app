@@ -1,13 +1,25 @@
-import {z} from "zod";
+import type {z} from "zod";
 
-export abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> {
-  constructor(public readonly name: string, public readonly serializationSchema: SerializationSchema) {}
+export abstract class SerializableStateSlice<
+  SerializationSchema extends z.ZodTypeAny,
+> {
+  constructor(
+    public readonly name: string,
+    public readonly serializationSchema: SerializationSchema,
+  ) {
+  }
+
   abstract serialize(): z.input<SerializationSchema>;
+
   abstract deserialize(data: z.output<SerializationSchema>): void;
 }
 
-export interface StateStorageInterface<SpecificStateSliceType extends SerializableStateSlice<any>> {
-  getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T;
+export interface StateStorageInterface<
+  SpecificStateSliceType extends SerializableStateSlice<any>,
+> {
+  getState<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+  ): T;
 
   mutateState<R, T extends SpecificStateSliceType>(
     ClassType: new (...args: any[]) => T,
@@ -20,11 +32,24 @@ export interface StateStorageInterface<SpecificStateSliceType extends Serializab
   ): void;
 }
 
-export default class StateManager<SpecificStateSliceType extends SerializableStateSlice<any>> implements StateStorageInterface<SpecificStateSliceType> {
-  state = new Map<new (...args: any[]) => SpecificStateSliceType, SpecificStateSliceType>();
-  private subscribers = new Map<new (...args: any[]) => SpecificStateSliceType, Set<(state: any) => void>>();
+export default class StateManager<
+  SpecificStateSliceType extends SerializableStateSlice<any>,
+> implements StateStorageInterface<SpecificStateSliceType> {
+  state = new Map<
+    new (
+      ...args: any[]
+    ) => SpecificStateSliceType,
+    SpecificStateSliceType
+  >();
+  private subscribers = new Map<
+    new (
+      ...args: any[]
+    ) => SpecificStateSliceType,
+    Set<(state: any) => void>
+  >();
 
-  constructor(private startingState: Record<string, unknown> = {}) {}
+  constructor(private startingState: Record<string, unknown> = {}) {
+  }
 
   initializeState<S, T extends SpecificStateSliceType>(
     ClassType: new (props: S) => T,
@@ -34,7 +59,9 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     this.state.set(ClassType, slice);
 
     if (Object.hasOwn(this.startingState, slice.name)) {
-      slice.deserialize(slice.serializationSchema.parse(this.startingState[slice.name]));
+      slice.deserialize(
+        slice.serializationSchema.parse(this.startingState[slice.name]),
+      );
     }
 
     return slice;
@@ -49,11 +76,15 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
       throw new Error(`State slice ${ClassType.name} not found`);
     }
     const result = callback(state);
-    this.subscribers.get(ClassType)?.forEach(cb => cb(state));
+    for (const subscriber of this.subscribers.get(ClassType) ?? []) {
+      subscriber(state);
+    }
     return result;
   }
 
-  getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T {
+  getState<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+  ): T {
     const stateSlice = this.state.get(ClassType);
     if (!stateSlice) {
       throw new Error(`State slice ${ClassType.name} not found`);
@@ -67,14 +98,17 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
   serialize(): Record<string, object> {
     return Object.fromEntries(
-      Array.from(this.state.values()).map(slice => [
+      Array.from(this.state.values()).map((slice) => [
         slice.name,
         slice.serialize(),
       ]),
     );
   }
 
-  deserialize(data: Record<string, unknown>, onMissing?: (key: string) => void): void {
+  deserialize(
+    data: Record<string, unknown>,
+    onMissing?: (key: string) => void,
+  ): void {
     for (const slice of this.state.values()) {
       const sliceData = data[slice.name];
       if (sliceData === undefined) {
@@ -96,7 +130,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     if (!this.subscribers.has(ClassType)) {
       this.subscribers.set(ClassType, new Set());
     }
-    this.subscribers.get(ClassType)!.add(callback);
+    this.subscribers.get(ClassType)?.add(callback);
 
     queueMicrotask(() => {
       if (this.subscribers.get(ClassType)?.has(callback)) {
@@ -117,7 +151,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
       return state;
     }
 
-    return new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         unsubscribe();
         reject(new Error(`Timeout waiting for state ${ClassType.name}`));
@@ -133,7 +167,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     });
   }
 
-  async waitForState<T extends SpecificStateSliceType>(
+  waitForState<T extends SpecificStateSliceType>(
     ClassType: new (...args: any[]) => T,
     predicate: (state: T) => boolean,
   ): Promise<T> {
@@ -147,9 +181,9 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     });
   }
 
-  async * subscribeAsync<T extends SpecificStateSliceType>(
+  async* subscribeAsync<T extends SpecificStateSliceType>(
     ClassType: new (...args: any[]) => T,
-    signal: AbortSignal
+    signal: AbortSignal,
   ): AsyncGenerator<T, void, unknown> {
     // Check if already aborted
     if (signal.aborted) {
@@ -170,7 +204,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
       }
     };
 
-    signal.addEventListener('abort', abortHandler);
+    signal.addEventListener("abort", abortHandler);
 
     // Subscribe to state changes
     const unsubscribe = this.subscribe(ClassType, (state) => {
@@ -199,7 +233,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
       }
     } finally {
       unsubscribe();
-      signal.removeEventListener('abort', abortHandler);
+      signal.removeEventListener("abort", abortHandler);
     }
   }
 }
