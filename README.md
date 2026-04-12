@@ -68,21 +68,25 @@ constructor(readonly config: TokenRingAppConfig)
 ```typescript
 addServices(...services: TokenRingService[]): void
 ```
+
 Register services with the application. Services are automatically initialized in registration order.
 
 ```typescript
 requireService<T>(serviceType: abstract new (...args: any[]) => T): T
 ```
+
 Get a service by type. Throws an error if the service is not found.
 
 ```typescript
 getService<T>(serviceType: abstract new (...args: any[]) => T): T | undefined
 ```
+
 Get a service by type. Returns undefined if the service is not found.
 
 ```typescript
 getServices(): TokenRingService[]
 ```
+
 Get all registered services.
 
 ```typescript
@@ -91,6 +95,7 @@ waitForService<T extends TokenRingService>(
   callback: (service: T) => void
 ): void
 ```
+
 Wait for a service to become available. The callback is invoked when the service is registered.
 
 ##### Logging
@@ -98,11 +103,13 @@ Wait for a service to become available. The callback is invoked when the service
 ```typescript
 serviceOutput(service: TokenRingService, ...messages: any[]): void
 ```
+
 Log system messages with formatted output. Messages are prefixed with the service name and stored in the logs array.
 
 ```typescript
 serviceError(service: TokenRingService, ...messages: any[]): void
 ```
+
 Log error messages with formatted output. Messages are prefixed with the service name and logged at error level.
 
 ##### Background Task Management
@@ -110,6 +117,7 @@ Log error messages with formatted output. Messages are prefixed with the service
 ```typescript
 runBackgroundTask(service: TokenRingService, initiator: (signal: AbortSignal) => Promise<void>): void
 ```
+
 Track an app-level promise and log any errors that occur. The task runs in the background and errors are automatically logged to the service. Tracks the number of concurrent background tasks per service.
 
 ##### State Management
@@ -117,11 +125,13 @@ Track an app-level promise and log any errors that occur. The task runs in the b
 ```typescript
 generateStateCheckpoint(): Record<string, object>
 ```
+
 Generate a session checkpoint containing the current state. Returns the serialized state from the state manager.
 
 ```typescript
 restoreState(state: AppSessionCheckpoint["state"]): void
 ```
+
 Restore state from a checkpoint. Unknown state slices trigger a log message.
 
 ##### Configuration
@@ -129,6 +139,7 @@ Restore state from a checkpoint. Unknown state slices trigger a log message.
 ```typescript
 getConfigSlice<T extends { parse: (any: any) => any }>(key: string, schema: T): z.output<T>
 ```
+
 Get a validated config slice using a Zod schema. Throws if the key doesn't exist or validation fails.
 
 ##### Lifecycle
@@ -136,12 +147,15 @@ Get a validated config slice using a Zod schema. Throws if the key doesn't exist
 ```typescript
 shutdown(reason: string = "App shutdown for unknown reason"): void
 ```
+
 Stop the application by aborting the internal AbortController. Displays a progress indicator showing services still running and background tasks. Automatically exits when all services have stopped.
 
 ```typescript
 async run(): Promise<void>
 ```
+
 Start all registered services and run the application lifecycle:
+
 1. Calls `start()` on all registered services
 2. Runs `run()` on all services that have it in a loop
    - If a service exits unexpectedly, it logs an error and restarts after 5 seconds
@@ -152,6 +166,7 @@ Start all registered services and run the application lifecycle:
 ```typescript
 get isShuttingDown: boolean
 ```
+
 Check if the application is shutting down. Returns true if the abort signal has been triggered.
 
 ### StateManager
@@ -173,6 +188,7 @@ constructor(startingState: Record<string, unknown> = {})
 ```typescript
 setStartingState(state: Record<string, unknown>): void
 ```
+
 Set the starting state that will be used when initializing state slices.
 
 ```typescript
@@ -181,6 +197,7 @@ initializeState<S, T extends SerializableStateSlice>(
   props: S
 ): T
 ```
+
 Initialize a state slice with the given class and props. If the starting state contains data for this slice, it will be deserialized automatically. Returns the initialized state slice.
 
 ```typescript
@@ -188,6 +205,7 @@ getState<T extends SerializableStateSlice>(
   StateClass: new (...args: any[]) => T
 ): T
 ```
+
 Get a state slice by class. Throws if not initialized.
 
 ```typescript
@@ -196,11 +214,13 @@ mutateState<R, T extends SerializableStateSlice>(
   callback: (state: T) => R
 ): R
 ```
+
 Mutate state with a callback. Returns the callback result. Automatically notifies all subscribers after mutation.
 
 ```typescript
 serialize(): Record<string, object>
 ```
+
 Serialize all state slices to a record keyed by state slice class name.
 
 ```typescript
@@ -209,16 +229,19 @@ deserialize(
   onMissing?: (key: string) => void
 ): void
 ```
+
 Deserialize state slices. Unknown keys trigger the onMissing callback. Validates data against serialization schema. Notifies all subscribers after deserialization.
 
 ```typescript
 forEach(cb: (item: SerializableStateSlice) => void): void
 ```
+
 Iterate over all state slices.
 
 ```typescript
 slices(): IterableIterator<SerializableStateSlice>
 ```
+
 Get an iterator of all state slices.
 
 ```typescript
@@ -227,6 +250,7 @@ subscribe<T extends SerializableStateSlice>(
   callback: (state: T) => void
 ): () => void
 ```
+
 Subscribe to state changes. Returns an unsubscribe function. The callback is invoked immediately via `queueMicrotask` with the current state.
 
 ```typescript
@@ -235,6 +259,7 @@ waitForState<T extends SerializableStateSlice>(
   predicate: (state: T) => boolean
 ): Promise<T>
 ```
+
 Wait for a state predicate to become true. Returns a promise that resolves when the predicate is satisfied.
 
 ```typescript
@@ -244,6 +269,7 @@ timedWaitForState<T extends SerializableStateSlice>(
   timeoutMs: number
 ): Promise<T>
 ```
+
 Wait for a state predicate with timeout. Rejects with an error if the timeout is exceeded.
 
 ```typescript
@@ -252,6 +278,7 @@ subscribeAsync<T extends SerializableStateSlice>(
   signal: AbortSignal
 ): AsyncGenerator<T, void, unknown>
 ```
+
 Async generator that yields state updates until aborted. Buffers state updates and yields them one at a time.
 
 ### PluginManager
@@ -263,6 +290,7 @@ Manages plugin installation and lifecycle. Implements `TokenRingService`.
 ```typescript
 constructor(app: TokenRingApp)
 ```
+
 Creates a new PluginManager and automatically registers it as a service with the provided app.
 
 #### Properties
@@ -277,12 +305,15 @@ Creates a new PluginManager and automatically registers it as a service with the
 ```typescript
 getPlugins(): TokenRingPlugin<ZodObject>[]
 ```
+
 Get all installed plugins.
 
 ```typescript
 async installPlugins(plugins: TokenRingPlugin<any>[]): Promise<void>
 ```
+
 Install plugins with configuration validation. The process is:
+
 1. Call `install()` on all plugins (if defined) - errors prevent plugin registration
 2. Register all plugins
 3. Call `start()` on all plugins (if defined) - errors prevent successful installation
@@ -294,7 +325,9 @@ Errors during installation prevent plugin registration. Errors during startup al
 ```typescript
 async reconfigurePlugins(newConfig: TokenRingAppConfig): Promise<{ restartRequired: boolean }>
 ```
+
 Reconfigure all plugins with new application configuration. The process is:
+
 1. For each plugin with configuration, compare the current config slice with the new config slice
 2. If the config changed and the plugin has a `reconfigure()` method, call it
 3. If the config changed but the plugin doesn't support reconfiguration, set `restartRequired` to true
@@ -318,6 +351,7 @@ Build application configuration by loading from multiple locations with Zod vali
 **Config Loading Order**: Config files are loaded from `~` (home) and `dataDirectory` in that order, with extensions `.ts`, `.mjs`, `.cjs`, `.js`. The config is validated at each step to ensure it is complete and well-formed.
 
 **Additional Behavior**:
+
 - Creates the data directory if it doesn't exist
 - Creates a `.gitignore` file in the data directory if it doesn't exist (with `*.sqlite*` pattern)
 - Merges configs using `deepMerge` from `@tokenring-ai/utility`
@@ -382,6 +416,7 @@ There are two types of plugins:
 ```
 
 **Important Notes**:
+
 - `install()` cannot be awaited. Any async operations must be done in `start()`
 - `start()` is called after all plugins are installed
 - `reconfigure()` is called when plugin configuration changes and the plugin supports reconfiguration

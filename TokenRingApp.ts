@@ -7,7 +7,7 @@ import type {z} from "zod";
 import type {TokenRingAppConfig} from "./schema.ts";
 import {AppLogsState} from "./state/AppLogsState.ts";
 import StateManager from "./StateManager.ts";
-import type {AppSessionCheckpoint, AppStateSlice, TokenRingService,} from "./types.ts";
+import type {AppSessionCheckpoint, AppStateSlice, TokenRingService} from "./types.ts";
 
 export type LogEntry = {
   timestamp: number;
