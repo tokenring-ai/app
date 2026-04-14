@@ -22,11 +22,23 @@ export default class TokenRingApp {
   readonly stateManager = new StateManager<AppStateSlice<any>>();
   readonly runningServices = new Set<TokenRingService>();
   readonly stoppingServices = new Set<TokenRingService>();
-  readonly backgroundTasks = new Map<TokenRingService, number>();
+  readonly backgroundTasks = new Map<string, number>();
 
   constructor(readonly config: TokenRingAppConfig) {
     // Initialize the logs state slice
     this.stateManager.initializeState(AppLogsState, {});
+    if (config.app.printLogs) {
+      this.runNamedBackgroundTask('TokenRingApp[LogWatcher]', async () => {
+        for await (const entry of this.subscribeLogsAsync(0,this.abortController.signal)) {
+          if (entry.level === 'error') {
+            console.error(entry.message);
+          } else {
+            console.log(entry.message);
+          }
+        }
+      });
+    }
+
   }
 
   services = new TypedRegistry<TokenRingService>();
@@ -83,9 +95,9 @@ export default class TokenRingApp {
     for (const service of this.stoppingServices) {
       lines.push(`  - ${service.name}: stop handler still running`);
     }
-    for (const [service, count] of this.backgroundTasks) {
+    for (const [name, count] of this.backgroundTasks) {
       if (count > 0) {
-        lines.push(`  - ${service.name}: ${count} background task(s) pending`);
+        lines.push(`  - ${name}: ${count} background task(s) pending`);
       }
     }
 
@@ -144,7 +156,7 @@ export default class TokenRingApp {
                     `Exited unexpectedly. Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`,
                   );
                 }
-              } catch (err) {
+              } catch (err: unknown) {
                 if (!signal.aborted) {
                   this.serviceError(
                     service,
@@ -165,7 +177,7 @@ export default class TokenRingApp {
           }
         }),
       );
-    } catch (err) {
+    } catch (err: unknown) {
       runError = err;
       this.shutdown(err instanceof Error ? err.message : "App run failed");
     } finally {
@@ -227,13 +239,20 @@ export default class TokenRingApp {
     service: TokenRingService,
     initiator: (signal: AbortSignal) => Promise<void>,
   ): void {
-    const count = this.backgroundTasks.get(service) || 0;
-    this.backgroundTasks.set(service, count + 1);
+    this.runNamedBackgroundTask(service.name, initiator);
+  }
+
+  private runNamedBackgroundTask(
+    name: string,
+    initiator: (signal: AbortSignal) => Promise<void>,
+  ): void {
+    const count = this.backgroundTasks.get(name) || 0;
+    this.backgroundTasks.set(name, count + 1);
     initiator(this.abortController.signal)
-      .catch((err) => this.serviceError(service, "Error:", err))
+      .catch((err) => this.namedError(name, "Error:", err))
       .finally(() => {
-        const count = this.backgroundTasks.get(service) || 0;
-        this.backgroundTasks.set(service, count - 1);
+        const count = this.backgroundTasks.get(name) || 0;
+        this.backgroundTasks.set(name, count - 1);
       });
   }
 
@@ -241,13 +260,34 @@ export default class TokenRingApp {
    * Log a system message
    */
   serviceOutput(service: TokenRingService, ...messages: any[]): void {
-    const message = `[${service.name}] ${formatLogMessages(messages)}`;
-    this.log("info", message);
+    this.namedOutput(service.name, ...messages);
   }
 
   serviceError(service: TokenRingService, ...messages: any[]): void {
-    const message = `[${service.name}] ${formatLogMessages(messages)}`;
+    this.namedError(service.name, ...messages);
+  }
+
+  private namedOutput(name: string, ...messages: any[]): void {
+    const message = `[${name}] ${formatLogMessages(messages)}`;
+    this.log("info", message);
+  }
+
+  private namedError(name: string, ...messages: any[]): void {
+    const message = `[${name}] ${formatLogMessages(messages)}`;
     this.log("error", message);
+  }
+
+
+  async * subscribeLogsAsync(position: number, signal: AbortSignal) {
+    for await (const state of this.stateManager.subscribeAsync(AppLogsState, signal)) {
+      if (state.logs.length <= position) {
+        continue;
+      }
+      for (const log of state.logs.slice(position)) {
+        yield log;
+      }
+      position = state.logs.length;
+    }
   }
 
   /**
@@ -259,7 +299,7 @@ export default class TokenRingApp {
   ): z.output<T> {
     try {
       return schema.parse(this.config[key]) as z.output<T>;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(
         `Invalid config value for key "${key}": ${(error as Error).message}`,
       );

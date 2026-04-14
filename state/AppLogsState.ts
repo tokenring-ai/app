@@ -42,10 +42,6 @@ export class AppLogsState extends AppStateSlice<typeof serializationSchema> {
     });
   }
 
-  clear(): void {
-    this.logs = [];
-  }
-
   getLogs(): LogEntry[] {
     return this.logs;
   }

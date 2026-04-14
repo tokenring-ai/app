@@ -29,7 +29,7 @@ export default class PluginManager implements TokenRingService {
             "config" in plugin ? plugin.config.parse(this.app.config) : {},
           );
         }
-      } catch (error) {
+      } catch (error: unknown) {
         this.app.serviceError(
           this,
           `Error early installing plugin "${plugin.name}":`,
@@ -43,13 +43,13 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.install) {
           this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-          plugin.install(
+          await plugin.install(
             this.app,
             "config" in plugin ? plugin.config.parse(this.app.config) : {},
           );
         }
         this.plugins.register(plugin.name, plugin);
-      } catch (error) {
+      } catch (error: unknown) {
         this.app.serviceError(
           this,
           `Error installing plugin "${plugin.name}":`,
@@ -68,7 +68,7 @@ export default class PluginManager implements TokenRingService {
             "config" in plugin ? plugin.config.parse(this.app.config) : {},
           );
         }
-      } catch (error) {
+      } catch (error: unknown) {
         this.app.serviceError(
           this,
           `Error starting plugin "${plugin.name}":`,
