@@ -10,7 +10,7 @@ export default class PluginManager implements TokenRingService {
 
   private plugins = new KeyedRegistry<TokenRingPlugin<any>>();
 
-  getPlugins = this.plugins.getAllItemValues;
+  getPlugins = this.plugins.valuesArray;
 
   constructor(private readonly app: TokenRingApp) {
     this.app.addServices(this);
@@ -48,7 +48,7 @@ export default class PluginManager implements TokenRingService {
             "config" in plugin ? plugin.config.parse(this.app.config) : {},
           );
         }
-        this.plugins.register(plugin.name, plugin);
+        this.plugins.set(plugin.name, plugin);
       } catch (error: unknown) {
         this.app.serviceError(
           this,
@@ -84,7 +84,7 @@ export default class PluginManager implements TokenRingService {
   ): Promise<{ restartRequired: boolean }> {
     let restartRequired = false;
 
-    const plugins = this.plugins.getAllItemValues();
+    const plugins = this.plugins.valuesArray();
     for (const plugin of plugins) {
       const hasConfig = "config" in plugin;
       if (hasConfig) {
