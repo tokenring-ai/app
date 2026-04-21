@@ -1,5 +1,5 @@
-import {z} from "zod";
-import {AppStateSlice} from "../types.ts";
+import { z } from "zod";
+import { AppStateSlice } from "../types.ts";
 
 export interface LogEntry {
   timestamp: number;

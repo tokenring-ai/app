@@ -1,76 +1,42 @@
-import type {z} from "zod";
+import type { z } from "zod";
 
-export abstract class SerializableStateSlice<
-  SerializationSchema extends z.ZodTypeAny,
-> {
+export abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> {
   constructor(
     public readonly name: string,
     public readonly serializationSchema: SerializationSchema,
-  ) {
-  }
+  ) {}
 
   abstract serialize(): z.input<SerializationSchema>;
 
   abstract deserialize(data: z.output<SerializationSchema>): void;
 }
 
-export interface StateStorageInterface<
-  SpecificStateSliceType extends SerializableStateSlice<any>,
-> {
-  getState<T extends SpecificStateSliceType>(
-    ClassType: new (...args: any[]) => T,
-  ): T;
+export interface StateStorageInterface<SpecificStateSliceType extends SerializableStateSlice<any>> {
+  getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T;
 
-  mutateState<R, T extends SpecificStateSliceType>(
-    ClassType: new (...args: any[]) => T,
-    callback: (state: T) => R,
-  ): R;
+  mutateState<R, T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: T) => R): R;
 
-  initializeState<S, T extends SpecificStateSliceType>(
-    ClassType: new (props: S) => T,
-    props: S,
-  ): void;
+  initializeState<S, T extends SpecificStateSliceType>(ClassType: new (props: S) => T, props: S): void;
 }
 
-export default class StateManager<
-  SpecificStateSliceType extends SerializableStateSlice<any>,
-> implements StateStorageInterface<SpecificStateSliceType> {
-  state = new Map<
-    new (
-      ...args: any[]
-    ) => SpecificStateSliceType,
-    SpecificStateSliceType
-  >();
-  private subscribers = new Map<
-    new (
-      ...args: any[]
-    ) => SpecificStateSliceType,
-    Set<(state: any) => void>
-  >();
+export default class StateManager<SpecificStateSliceType extends SerializableStateSlice<any>> implements StateStorageInterface<SpecificStateSliceType> {
+  state = new Map<new (...args: any[]) => SpecificStateSliceType, SpecificStateSliceType>();
+  private subscribers = new Map<new (...args: any[]) => SpecificStateSliceType, Set<(state: any) => void>>();
 
-  constructor(private startingState: Record<string, unknown> = {}) {
-  }
+  constructor(private startingState: Record<string, unknown> = {}) {}
 
-  initializeState<S, T extends SpecificStateSliceType>(
-    ClassType: new (props: S) => T,
-    props: S,
-  ): T {
+  initializeState<S, T extends SpecificStateSliceType>(ClassType: new (props: S) => T, props: S): T {
     const slice = new ClassType(props);
     this.state.set(ClassType, slice);
 
     if (Object.hasOwn(this.startingState, slice.name)) {
-      slice.deserialize(
-        slice.serializationSchema.parse(this.startingState[slice.name]),
-      );
+      slice.deserialize(slice.serializationSchema.parse(this.startingState[slice.name]));
     }
 
     return slice;
   }
 
-  mutateState<R, T extends SpecificStateSliceType>(
-    ClassType: new (...args: any[]) => T,
-    callback: (state: T) => R,
-  ): R {
+  mutateState<R, T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: T) => R): R {
     const state = this.state.get(ClassType) as T;
     if (!state) {
       throw new Error(`State slice ${ClassType.name} not found`);
@@ -82,9 +48,7 @@ export default class StateManager<
     return result;
   }
 
-  getState<T extends SpecificStateSliceType>(
-    ClassType: new (...args: any[]) => T,
-  ): T {
+  getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T {
     const stateSlice = this.state.get(ClassType);
     if (!stateSlice) {
       throw new Error(`State slice ${ClassType.name} not found`);
@@ -97,18 +61,10 @@ export default class StateManager<
   }
 
   serialize(): Record<string, object> {
-    return Object.fromEntries(
-      Array.from(this.state.values()).map((slice) => [
-        slice.name,
-        slice.serialize(),
-      ]),
-    );
+    return Object.fromEntries(Array.from(this.state.values()).map(slice => [slice.name, slice.serialize()]));
   }
 
-  deserialize(
-    data: Record<string, unknown>,
-    onMissing?: (key: string) => void,
-  ): void {
+  deserialize(data: Record<string, unknown>, onMissing?: (key: string) => void): void {
     for (const slice of this.state.values()) {
       const sliceData = data[slice.name];
       if (sliceData === undefined) {
@@ -123,10 +79,7 @@ export default class StateManager<
     return this.state.values();
   }
 
-  subscribe<T extends SpecificStateSliceType>(
-    ClassType: new (...args: any[]) => T,
-    callback: (state: T) => void,
-  ): () => void {
+  subscribe<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: T) => void): () => void {
     if (!this.subscribers.has(ClassType)) {
       this.subscribers.set(ClassType, new Set());
     }
@@ -157,7 +110,7 @@ export default class StateManager<
         reject(new Error(`Timeout waiting for state ${ClassType.name}`));
       }, timeoutMs);
 
-      const unsubscribe = this.subscribe(ClassType, (state) => {
+      const unsubscribe = this.subscribe(ClassType, state => {
         if (predicate(state)) {
           clearTimeout(timeout);
           unsubscribe();
@@ -167,12 +120,9 @@ export default class StateManager<
     });
   }
 
-  waitForState<T extends SpecificStateSliceType>(
-    ClassType: new (...args: any[]) => T,
-    predicate: (state: T) => boolean,
-  ): Promise<T> {
-    return new Promise((resolve) => {
-      const unsubscribe = this.subscribe(ClassType, (state) => {
+  waitForState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, predicate: (state: T) => boolean): Promise<T> {
+    return new Promise(resolve => {
+      const unsubscribe = this.subscribe(ClassType, state => {
         if (predicate(state)) {
           unsubscribe();
           resolve(state);
@@ -181,10 +131,7 @@ export default class StateManager<
     });
   }
 
-  async* subscribeAsync<T extends SpecificStateSliceType>(
-    ClassType: new (...args: any[]) => T,
-    signal: AbortSignal,
-  ): AsyncGenerator<T, void, unknown> {
+  async *subscribeAsync<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, signal: AbortSignal): AsyncGenerator<T, void, unknown> {
     // Check if already aborted
     if (signal.aborted) {
       return;
@@ -207,7 +154,7 @@ export default class StateManager<
     signal.addEventListener("abort", abortHandler);
 
     // Subscribe to state changes
-    const unsubscribe = this.subscribe(ClassType, (state) => {
+    const unsubscribe = this.subscribe(ClassType, state => {
       latestItem = state;
       if (resolveNext) {
         resolveNext();
@@ -219,7 +166,7 @@ export default class StateManager<
       while (!isComplete && !signal?.aborted) {
         // Wait for next item in queue
         if (latestItem === null) {
-          await new Promise<void>((resolve) => {
+          await new Promise<void>(resolve => {
             resolveNext = resolve;
           });
         }
