@@ -2,14 +2,17 @@
 
 ## Overview
 
-Base application framework for TokenRing applications, providing service management, plugin architecture, and state management through a unified interface. The package serves as the foundational infrastructure for building modular, extensible TokenRing applications with comprehensive lifecycle management.
+Base application framework for TokenRing applications, providing service management, plugin architecture, and state
+management through a unified interface. The package serves as the foundational infrastructure for building modular,
+extensible TokenRing applications with comprehensive lifecycle management.
 
 ## Features
 
 - **Service-Oriented Architecture**: Organizes functionality into configurable services with registry-based management
 - **Plugin-Based Extensions**: Seamless integration with plugin system for modular functionality
 - **Type-Safe Configuration**: Zod-based validation for all configuration schemas with layered config loading
-- **Lifecycle Management**: Controlled initialization, startup, and shutdown processes with automatic service restart on error
+- **Lifecycle Management**: Controlled initialization, startup, and shutdown processes with automatic service restart on
+  error
 - **State Isolation**: Separate state slices with serialization and deserialization support
 - **Signal-Based Shutdown**: Graceful termination using AbortSignal with progress indicator
 - **Background Task Management**: Automatic error handling for async background tasks with tracking
@@ -17,6 +20,7 @@ Base application framework for TokenRing applications, providing service managem
 - **Async State Subscriptions**: Support for async state observation with abort handling
 - **Service Auto-Restart**: Services that exit unexpectedly are automatically restarted after 5 seconds
 - **Session Checkpointing**: Generate and restore app session state with persistence
+- **Config Directory Loading**: Load configuration from multiple YAML files across directories
 
 ## Installation
 
@@ -30,7 +34,7 @@ This package depends on:
 
 - `@tokenring-ai/agent` (0.2.0) - Core agent orchestration
 - `@tokenring-ai/utility` (0.2.0) - Shared utilities and helpers
-- `uuid` (^13.0.0) - Unique identifier generation
+- `@tokenring-ai/rpc` (0.2.0) - RPC infrastructure
 - `zod` (^4.3.6) - Type validation
 
 ## Core Components
@@ -45,21 +49,22 @@ The main application class that orchestrates services, configuration, and lifecy
 constructor(readonly config: TokenRingAppConfig)
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| config | TokenRingAppConfig | Application configuration with validated schema |
+| Parameter | Type               | Description                                     |
+|-----------|--------------------|-------------------------------------------------|
+| config    | TokenRingAppConfig | Application configuration with validated schema |
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| config | TokenRingAppConfig | The application configuration |
-| sessionId | string | Unique session ID for this instance |
-| stateManager | StateManager<AppStateSlice<any>> | State manager for app-level state |
-| runningServices | Set<TokenRingService> | Set of services currently running |
-| stoppingServices | Set<TokenRingService> | Set of services currently stopping |
-| backgroundTasks | Map<TokenRingService, number> | Map tracking background task counts per service |
-| services | TypedRegistry<TokenRingService> | Registry of all registered services |
+| Property         | Type                             | Description                                          |
+|------------------|----------------------------------|------------------------------------------------------|
+| config           | TokenRingAppConfig               | The application configuration                        |
+| sessionId        | string                           | Unique session ID for this instance                  |
+| stateManager     | StateManager<AppStateSlice<any>> | State manager for app-level state                    |
+| runningServices  | Set<TokenRingService>            | Set of services currently running                    |
+| stoppingServices | Set<TokenRingService>            | Set of services currently stopping                   |
+| backgroundTasks  | Map<string, number>              | Map tracking background task counts per service name |
+| services         | TypedRegistry<TokenRingService>  | Registry of all registered services                  |
+| logs             | LogEntry[]                       | Array of log entries (info and error)                |
 
 #### Methods
 
@@ -112,13 +117,20 @@ serviceError(service: TokenRingService, ...messages: any[]): void
 
 Log error messages with formatted output. Messages are prefixed with the service name and logged at error level.
 
+```typescript
+serviceOutput(service: TokenRingService, ...messages: any[]): void
+```
+
+Log informational messages with service context.
+
 ##### Background Task Management
 
 ```typescript
 runBackgroundTask(service: TokenRingService, initiator: (signal: AbortSignal) => Promise<void>): void
 ```
 
-Track an app-level promise and log any errors that occur. The task runs in the background and errors are automatically logged to the service. Tracks the number of concurrent background tasks per service.
+Track an app-level promise and log any errors that occur. The task runs in the background and errors are automatically
+logged to the service. Tracks the number of concurrent background tasks per service.
 
 ##### State Management
 
@@ -148,7 +160,8 @@ Get a validated config slice using a Zod schema. Throws if the key doesn't exist
 shutdown(reason: string = "App shutdown for unknown reason"): void
 ```
 
-Stop the application by aborting the internal AbortController. Displays a progress indicator showing services still running and background tasks. Automatically exits when all services have stopped.
+Stop the application by aborting the internal AbortController. Displays a progress indicator showing services still
+running and background tasks. Automatically exits when all services have stopped.
 
 ```typescript
 async run(): Promise<void>
@@ -158,9 +171,9 @@ Start all registered services and run the application lifecycle:
 
 1. Calls `start()` on all registered services
 2. Runs `run()` on all services that have it in a loop
-   - If a service exits unexpectedly, it logs an error and restarts after 5 seconds
-   - If a service throws an error, it logs the error and restarts after 5 seconds
-   - Services continue running until the abort signal is triggered
+ - If a service exits unexpectedly, it logs an error and restarts after 5 seconds
+ - If a service throws an error, it logs the error and restarts after 5 seconds
+ - Services continue running until the abort signal is triggered
 3. Calls `stop()` on all registered services when shutdown
 
 ```typescript
@@ -168,6 +181,13 @@ get isShuttingDown: boolean
 ```
 
 Check if the application is shutting down. Returns true if the abort signal has been triggered.
+
+```typescript
+async *subscribeLogsAsync(position: number, signal: AbortSignal): AsyncGenerator<LogEntry, void, unknown>
+```
+
+Async generator that yields log entries starting from the given position. Yields new log entries as they are added until
+the signal is aborted.
 
 ### StateManager
 
@@ -179,8 +199,8 @@ Type-safe state management with serialization support.
 constructor(startingState: Record<string, unknown> = {})
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter     | Type                    | Description                                         |
+|---------------|-------------------------|-----------------------------------------------------|
 | startingState | Record<string, unknown> | Optional initial state to restore on initialization |
 
 #### Methods
@@ -198,7 +218,8 @@ initializeState<S, T extends SerializableStateSlice>(
 ): T
 ```
 
-Initialize a state slice with the given class and props. If the starting state contains data for this slice, it will be deserialized automatically. Returns the initialized state slice.
+Initialize a state slice with the given class and props. If the starting state contains data for this slice, it will be
+deserialized automatically. Returns the initialized state slice.
 
 ```typescript
 getState<T extends SerializableStateSlice>(
@@ -230,7 +251,8 @@ deserialize(
 ): void
 ```
 
-Deserialize state slices. Unknown keys trigger the onMissing callback. Validates data against serialization schema. Notifies all subscribers after deserialization.
+Deserialize state slices. Unknown keys trigger the onMissing callback. Validates data against serialization schema.
+Notifies all subscribers after deserialization.
 
 ```typescript
 forEach(cb: (item: SerializableStateSlice) => void): void
@@ -251,7 +273,8 @@ subscribe<T extends SerializableStateSlice>(
 ): () => void
 ```
 
-Subscribe to state changes. Returns an unsubscribe function. The callback is invoked immediately via `queueMicrotask` with the current state.
+Subscribe to state changes. Returns an unsubscribe function. The callback is invoked immediately via `queueMicrotask`
+with the current state.
 
 ```typescript
 waitForState<T extends SerializableStateSlice>(
@@ -273,7 +296,7 @@ timedWaitForState<T extends SerializableStateSlice>(
 Wait for a state predicate with timeout. Rejects with an error if the timeout is exceeded.
 
 ```typescript
-subscribeAsync<T extends SerializableStateSlice>(
+async *subscribeAsync<T extends SerializableStateSlice>(
   StateClass: new (...args: any[]) => T,
   signal: AbortSignal
 ): AsyncGenerator<T, void, unknown>
@@ -295,15 +318,15 @@ Creates a new PluginManager and automatically registers it as a service with the
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| name | "PluginManager" | Service name |
+| Property    | Type              | Description         |
+|-------------|-------------------|---------------------|
+| name        | "PluginManager"   | Service name        |
 | description | "Manages plugins" | Service description |
 
 #### Methods
 
 ```typescript
-getPlugins(): TokenRingPlugin<ZodObject>[]
+getPlugins(): TokenRingPlugin<any>[]
 ```
 
 Get all installed plugins.
@@ -314,13 +337,16 @@ async installPlugins(plugins: TokenRingPlugin<any>[]): Promise<void>
 
 Install plugins with configuration validation. The process is:
 
-1. Call `install()` on all plugins (if defined) - errors prevent plugin registration
-2. Register all plugins
-3. Call `start()` on all plugins (if defined) - errors prevent successful installation
+1. Call `earlyInstall()` on all plugins (if defined) - errors prevent plugin registration
+2. Call `install()` on all plugins (if defined) - errors prevent plugin registration
+3. Register all plugins
+4. Call `start()` on all plugins (if defined) - errors prevent successful installation
 
-For plugins with configuration, the config is parsed from `app.config` and passed to both `install()` and `start()`. For plugins without configuration, an empty object is passed.
+For plugins with configuration, the config is parsed from `app.config` and passed to `earlyInstall()`, `install()`, and
+`start()`. For plugins without configuration, an empty object is passed.
 
-Errors during installation prevent plugin registration. Errors during startup also prevent the plugin from being considered successfully installed.
+Errors during installation prevent plugin registration. Errors during startup also prevent the plugin from being
+considered successfully installed.
 
 ```typescript
 async reconfigurePlugins(newConfig: TokenRingAppConfig): Promise<{ restartRequired: boolean }>
@@ -337,18 +363,20 @@ Returns `{ restartRequired: boolean }` indicating whether any plugins require a 
 ### buildTokenRingAppConfig
 
 ```typescript
-async function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
+function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
   defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>
-): Promise<z.output<T>>
+): z.output<T>
 ```
 
-Build application configuration by loading from multiple locations with Zod validation.
+Build application configuration by loading from multiple YAML files across directories with Zod validation.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter     | Type                                                  | Description                                          |
+|---------------|-------------------------------------------------------|------------------------------------------------------|
 | defaultConfig | z.input<T> & z.input<typeof TokenRingAppConfigSchema> | Default configuration including app config structure |
 
-**Config Loading Order**: Config files are loaded from `~` (home) and `dataDirectory` in that order, with extensions `.ts`, `.mjs`, `.cjs`, `.js`. The config is validated at each step to ensure it is complete and well-formed.
+**Config Loading Process**: Config files are loaded from each directory in `configDirectories` in order. All `.yaml`
+files in each directory are scanned and merged using `deepMerge` from `@tokenring-ai/utility`. The config is validated
+at each step to ensure it is complete and well-formed.
 
 **Additional Behavior**:
 
@@ -356,6 +384,7 @@ Build application configuration by loading from multiple locations with Zod vali
 - Creates a `.gitignore` file in the data directory if it doesn't exist (with `*.sqlite*` pattern)
 - Merges configs using `deepMerge` from `@tokenring-ai/utility`
 - Validates the merged config at each step using `configSchema.parse()`
+- Supports YAML configuration files only
 
 ## Types
 
@@ -366,24 +395,24 @@ Interface for services that can be registered with the application.
 ```typescript
 interface TokenRingService {
   readonly name: string;
-  description: string;
-  run?(signal: AbortSignal): Promise<void>;
-  start?(signal: AbortSignal): Promise<void> | void;
-  stop?(): Promise<void> | void;
+  readonly description: string;
+  run?(signal: AbortSignal): MaybePromise<void>;
+  start?(signal: AbortSignal): MaybePromise<void>;
+  stop?(): MaybePromise<void>;
   attach?(agent: Agent, creationContext: AgentCreationContext): void;
   detach?(agent: Agent): void;
 }
 ```
 
-| Property/Method | Description |
-|-----------------|-------------|
-| `name` | Unique service name |
-| `description` | Human-readable service description |
-| `run` | Main service loop. Called after `start()`. Exited services are automatically restarted after 5 seconds |
-| `start` | Initialization logic. Called before `run()` |
-| `stop` | Cleanup logic. Called during shutdown |
-| `attach` | Attach to an agent with creation context |
-| `detach` | Detach from an agent |
+| Property/Method | Description                                                                                            |
+|-----------------|--------------------------------------------------------------------------------------------------------|
+| `name`          | Unique service name                                                                                    |
+| `description`   | Human-readable service description                                                                     |
+| `run`           | Main service loop. Called after `start()`. Exited services are automatically restarted after 5 seconds |
+| `start`         | Initialization logic. Called before `run()`                                                            |
+| `stop`          | Cleanup logic. Called during shutdown                                                                  |
+| `attach`        | Attach to an agent with creation context                                                               |
+| `detach`        | Detach from an agent                                                                                   |
 
 ### TokenRingPlugin
 
@@ -394,10 +423,12 @@ There are two types of plugins:
 ```typescript
 {
   readonly name: string;
-  version: string;
-  description: string;
-  install?: (app: TokenRingApp) => void | undefined; // Install does not allow awaiting, anything awaited must be done in start
-  start?: (app: TokenRingApp) => Promise<void> | void;
+  readonly displayName: string;
+  readonly version: string;
+  readonly description: string;
+  earlyInstall?: (app: TokenRingApp) => MaybePromise<void>;
+  install?: (app: TokenRingApp) => MaybePromise<void | undefined>;
+  start?: (app: TokenRingApp) => MaybePromise<void>;
 }
 ```
 
@@ -406,21 +437,24 @@ There are two types of plugins:
 ```typescript
 {
   readonly name: string;
-  version: string;
-  description: string;
-  config: ConfigType;  // Zod schema
-  install?: (app: TokenRingApp, config: z.output<ConfigType>) => void | undefined; // Install does not allow awaiting, anything awaited must be done in start
-  start?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
-  reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => Promise<void> | void;
+  readonly displayName: string;
+  readonly version: string;
+  readonly description: string;
+  readonly config: ConfigType;  // Zod schema
+  earlyInstall?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
+  install?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void | undefined>;
+  start?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
+  reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
 }
 ```
 
 **Important Notes**:
 
-- `install()` cannot be awaited. Any async operations must be done in `start()`
+- `earlyInstall()` is called before `install()` and can be awaited
+- `install()` is called for all plugins before any `start()` is called
 - `start()` is called after all plugins are installed
 - `reconfigure()` is called when plugin configuration changes and the plugin supports reconfiguration
-- For plugins with config, both `install()` and `start()` receive the parsed config from `app.config`
+- For plugins with config, `earlyInstall()`, `install()`, and `start()` receive the parsed config from `app.config`
 
 ### SerializableStateSlice
 
@@ -439,11 +473,10 @@ abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> 
 }
 ```
 
-| Method | Description |
-|--------|-------------|
-| `serialize()` | Serialize state to a format matching the schema's input |
-| `deserialize()` | Deserialize state from validated schema output |
-| `getValidatedState()` | Get validated state from a state snapshot, returns null if not present |
+| Method          | Description                                             |
+|-----------------|---------------------------------------------------------|
+| `serialize()`   | Serialize state to a format matching the schema's input |
+| `deserialize()` | Deserialize state from validated schema output          |
 
 ### AppStateSlice
 
@@ -500,10 +533,11 @@ interface StateStorageInterface<SpecificStateSliceType extends SerializableState
 export const TokenRingAppConfigSchema = z.object({
   app: z.object({
     dataDirectory: z.string(),
-    configFileName: z.string(),
+    configDirectories: z.array(z.string()),
     configSchema: z.custom<z.ZodTypeAny>(),
     shutdownMonitorIntervalMs: z.number().default(2000),
     serviceRestartDelayMs: z.number().default(5000),
+    printLogs: z.boolean().default(false),
   })
 });
 
@@ -514,12 +548,34 @@ export type TokenRingAppConfig = z.output<typeof LooseTokenRingAppConfigSchema>;
 ### LogEntry
 
 ```typescript
-type LogEntry = {
+interface LogEntry {
   timestamp: number;
   level: "info" | "error";
   message: string;
-};
+}
 ```
+
+### AppLogsState
+
+State slice for managing application logs.
+
+```typescript
+class AppLogsState extends AppStateSlice<typeof serializationSchema> {
+  logs: LogEntry[] = [];
+  
+  addLog(level: "info" | "error", message: string): void;
+  getLogs(): LogEntry[];
+  serialize(): z.output<typeof serializationSchema>;
+  deserialize(data: z.output<typeof serializationSchema>): void;
+}
+```
+
+| Method          | Description                                        |
+|-----------------|----------------------------------------------------|
+| `addLog()`      | Add a log entry with timestamp, level, and message |
+| `getLogs()`     | Get all log entries                                |
+| `serialize()`   | Serialize logs for checkpointing                   |
+| `deserialize()` | Deserialize logs from checkpoint                   |
 
 ## Usage Examples
 
@@ -537,10 +593,11 @@ const AppConfigSchema = z.object({
 const config = {
   app: {
     dataDirectory: "/path/to/data",
-    configFileName: "app.config",
+    configDirectories: ["/path/to/config"],
     configSchema: AppConfigSchema,
     shutdownMonitorIntervalMs: 2000,
     serviceRestartDelayMs: 5000,
+    printLogs: false,
   },
   apiKey: "your-api-key",
   model: "gpt-3.5-turbo"
@@ -605,13 +662,18 @@ const MyPluginConfigSchema = z.object({
 });
 
 const myPlugin: TokenRingPlugin<typeof MyPluginConfigSchema> = {
-  name: "MyPlugin",
+  name: "my-plugin",
+  displayName: "My Plugin",
   version: "1.0.0",
   description: "My custom plugin with config",
   config: MyPluginConfigSchema,
+  earlyInstall(app, config) {
+    console.log(`Early installing with API key: ${config.apiKey}`);
+    // Can await here
+  },
   install(app, config) {
-    console.log(`Installing with API key: ${config.apiKey}`);
-    // Note: Cannot await here, use start() for async operations
+    console.log(`Installing with model: ${config.model}`);
+    // Can await here
   },
   start(app, config) {
     console.log(`Starting with model: ${config.model}`);
@@ -633,12 +695,17 @@ import type { TokenRingPlugin } from "@tokenring-ai/app";
 import TokenRingApp from "@tokenring-ai/app";
 
 const myPlugin: TokenRingPlugin = {
-  name: "MySimplePlugin",
+  name: "my-simple-plugin",
+  displayName: "My Simple Plugin",
   version: "1.0.0",
   description: "A simple plugin without config",
+  earlyInstall(app) {
+    console.log("Early installing simple plugin");
+    // Can await here
+  },
   install(app) {
     console.log("Installing simple plugin");
-    // Cannot await here
+    // Can await here
   },
   start(app) {
     console.log("Starting simple plugin");
@@ -740,13 +807,14 @@ const AppConfigSchema = z.object({
   model: z.string().default("gpt-4")
 });
 
-const config = await buildTokenRingAppConfig({
+const config = buildTokenRingAppConfig({
   app: {
     dataDirectory: "/path/to/data",
-    configFileName: "app.config",
+    configDirectories: ["/path/to/config"],
     configSchema: AppConfigSchema,
     shutdownMonitorIntervalMs: 2000,
     serviceRestartDelayMs: 5000,
+    printLogs: false,
   },
   apiKey: "",
   model: "gpt-3.5-turbo"
@@ -763,11 +831,12 @@ import TokenRingApp from "@tokenring-ai/app";
 const pluginManager = new PluginManager(app);
 
 const myPlugin: TokenRingPlugin = {
-  name: "MyPlugin",
+  name: "my-plugin",
+  displayName: "My Plugin",
   version: "1.0.0",
   description: "Custom plugin",
   install(app) {
-    // Set up plugin (cannot await)
+    // Set up plugin (can await)
   },
   start(app) {
     // Start plugin (can await)
@@ -794,7 +863,8 @@ const MyPluginConfigSchema = z.object({
 });
 
 const myPlugin: TokenRingPlugin<typeof MyPluginConfigSchema> = {
-  name: "MyPlugin",
+  name: "my-plugin",
+  displayName: "My Plugin",
   version: "1.0.0",
   description: "Plugin with reconfiguration support",
   config: MyPluginConfigSchema,
@@ -923,6 +993,23 @@ app.shutdown("User requested shutdown");
 // and automatically exit when all services have stopped
 ```
 
+### Log Subscription
+
+```typescript
+import TokenRingApp from "@tokenring-ai/app";
+
+const app = new TokenRingApp(config);
+
+// Subscribe to log entries
+const signal = new AbortController().signal;
+for await (const entry of app.subscribeLogsAsync(0, signal)) {
+  console.log(`[${entry.level}] ${entry.message}`);
+}
+
+// Logs are also accessible via app.logs
+console.log(app.logs);
+```
+
 ## Configuration
 
 ### Application Configuration Schema
@@ -931,10 +1018,11 @@ app.shutdown("User requested shutdown");
 const TokenRingAppConfigSchema = z.object({
   app: z.object({
     dataDirectory: z.string(),
-    configFileName: z.string(),
+    configDirectories: z.array(z.string()),
     configSchema: z.custom<z.ZodTypeAny>(),
     shutdownMonitorIntervalMs: z.number().default(2000),
     serviceRestartDelayMs: z.number().default(5000),
+    printLogs: z.boolean().default(false),
   })
 });
 
@@ -952,7 +1040,8 @@ const MyPluginSchema = z.object({
 });
 
 const myPlugin: TokenRingPlugin<typeof MyPluginSchema> = {
-  name: "MyPlugin",
+  name: "my-plugin",
+  displayName: "My Plugin",
   version: "1.0.0",
   description: "Plugin with config",
   config: MyPluginSchema,
@@ -969,52 +1058,53 @@ const myPlugin: TokenRingPlugin<typeof MyPluginSchema> = {
 
 ### TokenRingApp
 
-| Method | Description |
-|--------|-------------|
-| `addServices(...services)` | Register services with application |
-| `requireService(serviceType)` | Get service by type (throws if not found) |
-| `getService(serviceType)` | Get service by type (returns undefined if not found) |
-| `getServices()` | Get all registered services |
-| `waitForService(serviceType, callback)` | Wait for service to be available |
-| `getConfigSlice(key, schema)` | Get validated config slice |
-| `serviceOutput(service, ...messages)` | Log system messages with service context |
-| `serviceError(service, ...messages)` | Log error messages with service context |
-| `runBackgroundTask(service, initiator)` | Track background task and log errors |
-| `generateStateCheckpoint()` | Generate session state checkpoint |
-| `restoreState(state)` | Restore state from checkpoint |
-| `shutdown(reason?)` | Stop the application with optional reason |
-| `run()` | Start application services and run lifecycle |
-| `isShuttingDown` | Check if application is shutting down |
+| Method                                  | Description                                          |
+|-----------------------------------------|------------------------------------------------------|
+| `addServices(...services)`              | Register services with application                   |
+| `requireService(serviceType)`           | Get service by type (throws if not found)            |
+| `getService(serviceType)`               | Get service by type (returns undefined if not found) |
+| `getServices()`                         | Get all registered services                          |
+| `waitForService(serviceType, callback)` | Wait for service to be available                     |
+| `getConfigSlice(key, schema)`           | Get validated config slice                           |
+| `serviceOutput(service, ...messages)`   | Log informational messages with service context      |
+| `serviceError(service, ...messages)`    | Log error messages with service context              |
+| `runBackgroundTask(service, initiator)` | Track background task and log errors                 |
+| `generateStateCheckpoint()`             | Generate session state checkpoint                    |
+| `restoreState(state)`                   | Restore state from checkpoint                        |
+| `shutdown(reason?)`                     | Stop the application with optional reason            |
+| `run()`                                 | Start application services and run lifecycle         |
+| `isShuttingDown`                        | Check if application is shutting down                |
+| `subscribeLogsAsync(position, signal)`  | Async generator for log entries                      |
+| `logs`                                  | Get all log entries                                  |
 
 ### StateManager
 
-| Method | Description |
-|--------|-------------|
-| `setStartingState(state)` | Set starting state |
-| `initializeState(StateClass, props)` | Initialize state slice |
-| `getState(StateClass)` | Get state slice |
-| `mutateState(StateClass, callback)` | Mutate state with callback |
-| `serialize()` | Serialize all state slices |
-| `deserialize(data, onMissing)` | Deserialize state slices |
-| `forEach(cb)` | Iterate over state slices |
-| `slices()` | Get iterator of state slices |
-| `subscribe(StateClass, callback)` | Subscribe to changes |
-| `waitForState(StateClass, predicate)` | Wait for state predicate |
-| `timedWaitForState(StateClass, predicate, timeout)` | Wait with timeout |
-| `subscribeAsync(StateClass, signal)` | Async state generator |
+| Method                                              | Description                  |
+|-----------------------------------------------------|------------------------------|
+| `initializeState(StateClass, props)`                | Initialize state slice       |
+| `getState(StateClass)`                              | Get state slice              |
+| `mutateState(StateClass, callback)`                 | Mutate state with callback   |
+| `serialize()`                                       | Serialize all state slices   |
+| `deserialize(data, onMissing)`                      | Deserialize state slices     |
+| `forEach(cb)`                                       | Iterate over state slices    |
+| `slices()`                                          | Get iterator of state slices |
+| `subscribe(StateClass, callback)`                   | Subscribe to changes         |
+| `waitForState(StateClass, predicate)`               | Wait for state predicate     |
+| `timedWaitForState(StateClass, predicate, timeout)` | Wait with timeout            |
+| `subscribeAsync(StateClass, signal)`                | Async state generator        |
 
 ### PluginManager
 
-| Method | Description |
-|--------|-------------|
-| `installPlugins(plugins)` | Install plugins with validation |
-| `getPlugins()` | Get all installed plugins |
-| `reconfigurePlugins(newConfig)` | Reconfigure all plugins |
+| Method                          | Description                     |
+|---------------------------------|---------------------------------|
+| `installPlugins(plugins)`       | Install plugins with validation |
+| `getPlugins()`                  | Get all installed plugins       |
+| `reconfigurePlugins(newConfig)` | Reconfigure all plugins         |
 
 ### buildTokenRingAppConfig
 
-| Parameter | Description |
-|-----------|-------------|
+| Parameter       | Description                                          |
+|-----------------|------------------------------------------------------|
 | `defaultConfig` | Default configuration including app config structure |
 
 ## Error Handling
@@ -1024,9 +1114,11 @@ The application provides comprehensive error handling:
 - **Configuration Errors**: Zod validation errors with descriptive messages when config is invalid
 - **Service Not Found**: Clear error when requiring a service that doesn't exist via `requireService()`
 - **Promise Errors**: Automatic logging of errors in background tasks via `runBackgroundTask()`
-- **Lifecycle Errors**: Graceful shutdown handling during startup failures; services that exit unexpectedly are restarted after 5 seconds
+- **Lifecycle Errors**: Graceful shutdown handling during startup failures; services that exit unexpectedly are
+  restarted after 5 seconds
 - **State Errors**: Safe deserialization with error callbacks for unknown keys; schema validation on deserialize
-- **Plugin Errors**: Errors during plugin installation prevent plugin registration; errors during startup also prevent successful installation
+- **Plugin Errors**: Errors during plugin installation prevent plugin registration; errors during startup also prevent
+  successful installation
 
 ## Integration
 
@@ -1110,7 +1202,8 @@ const MyPluginSchema = z.object({
 });
 
 const myPlugin: TokenRingPlugin<typeof MyPluginSchema> = {
-  name: "MyPlugin",
+  name: "my-plugin",
+  displayName: "My Plugin",
   version: "1.0.0",
   description: "Plugin with reconfiguration support",
   config: MyPluginSchema,
