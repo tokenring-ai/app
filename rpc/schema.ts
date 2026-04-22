@@ -19,6 +19,19 @@ const AppRpcSchema = {
         ),
       }),
     },
+    getLogs: {
+      type: "query" as const,
+      input: z.object({}),
+      result: z.object({
+        logs: z.array(
+          z.object({
+            timestamp: z.number(),
+            level: z.enum(["info", "error"]),
+            message: z.string(),
+          }),
+        ),
+      }),
+    },
   },
 };
 

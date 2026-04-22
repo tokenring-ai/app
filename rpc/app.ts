@@ -16,4 +16,7 @@ export default createRPCEndpoint(AppRpcSchema, {
       })),
     };
   },
+  getLogs(_args, app: TokenRingApp) {
+    return { logs: app.logs };
+  },
 });

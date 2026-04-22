@@ -30,11 +30,11 @@ export interface TokenRingService {
   readonly name: string;
   readonly description: string;
 
-  run?(signal: AbortSignal): Promise<void>;
+  run?(signal: AbortSignal): MaybePromise<void>;
 
-  start?(signal: AbortSignal): Promise<void> | void;
+  start?(signal: AbortSignal): MaybePromise<void>;
 
-  stop?(): Promise<void> | void;
+  stop?(): MaybePromise<void>;
 
   attach?(agent: Agent, creationContext: AgentCreationContext): void;
 
