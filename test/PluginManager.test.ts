@@ -1,15 +1,15 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import PluginManager from '../PluginManager';
-import TokenRingApp from '../TokenRingApp';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import PluginManager from "../PluginManager";
+import TokenRingApp from "../TokenRingApp";
 import createTestingApp from "./createTestingApp";
 
-describe('PluginManager', () => {
+describe("PluginManager", () => {
   let mockApp: TokenRingApp;
   let pluginManager: PluginManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Create a real app instance for proper testing
     mockApp = createTestingApp();
     pluginManager = new PluginManager(mockApp);
@@ -19,34 +19,34 @@ describe('PluginManager', () => {
     vi.clearAllMocks();
   });
 
-  describe('Constructor', () => {
-    it('should initialize with correct name and description', () => {
-      expect(pluginManager.name).toBe('PluginManager');
-      expect(pluginManager.description).toBe('Manages plugins');
+  describe("Constructor", () => {
+    it("should initialize with correct name and description", () => {
+      expect(pluginManager.name).toBe("PluginManager");
+      expect(pluginManager.description).toBe("Manages plugins");
     });
 
-    it('should register itself as a service', () => {
+    it("should register itself as a service", () => {
       expect(mockApp.getServices()).toContain(pluginManager);
     });
 
-    it('should initialize plugins registry', () => {
+    it("should initialize plugins registry", () => {
       expect(pluginManager.getPlugins).toBeDefined();
-      expect(typeof pluginManager.getPlugins).toBe('function');
+      expect(typeof pluginManager.getPlugins).toBe("function");
     });
   });
 
-  describe('Plugin Installation', () => {
+  describe("Plugin Installation", () => {
     beforeEach(() => {
       // Create fresh instances for each test
       mockApp = createTestingApp();
       pluginManager = new PluginManager(mockApp);
     });
 
-    it('should install single plugin successfully', async () => {
+    it("should install single plugin successfully", async () => {
       class TestPlugin {
-        readonly name = 'TestPlugin';
-        version = '1.0.0';
-        description = 'A test plugin';
+        readonly name = "TestPlugin";
+        version = "1.0.0";
+        description = "A test plugin";
         install = vi.fn();
         start = vi.fn().mockResolvedValue(undefined);
       }
@@ -60,19 +60,19 @@ describe('PluginManager', () => {
       expect(mockPlugin.start).toHaveBeenCalledWith(mockApp, {});
     });
 
-    it('should install multiple plugins', async () => {
+    it("should install multiple plugins", async () => {
       class Plugin1 {
-        readonly name = 'Plugin1';
-        version = '1.0.0';
-        description = 'First plugin';
+        readonly name = "Plugin1";
+        version = "1.0.0";
+        description = "First plugin";
         install = vi.fn();
         start = vi.fn().mockResolvedValue(undefined);
       }
 
       class Plugin2 {
-        readonly name = 'Plugin2';
-        version = '1.0.0';
-        description = 'Second plugin';
+        readonly name = "Plugin2";
+        version = "1.0.0";
+        description = "Second plugin";
         install = vi.fn();
         start = vi.fn().mockResolvedValue(undefined);
       }
@@ -88,11 +88,11 @@ describe('PluginManager', () => {
       expect(plugins).toContain(plugin2);
     });
 
-    it('should handle plugins without optional install method', async () => {
+    it("should handle plugins without optional install method", async () => {
       class MinimalPlugin {
-        readonly name = 'MinimalPlugin';
-        version = '1.0.0';
-        description = 'Minimal plugin';
+        readonly name = "MinimalPlugin";
+        version = "1.0.0";
+        description = "Minimal plugin";
         start = vi.fn().mockResolvedValue(undefined);
       }
 
@@ -104,11 +104,11 @@ describe('PluginManager', () => {
       expect(plugin.start).toHaveBeenCalledWith(mockApp, {});
     });
 
-    it('should handle plugins without optional start method', async () => {
+    it("should handle plugins without optional start method", async () => {
       class NoStartPlugin {
-        readonly name = 'NoStartPlugin';
-        version = '1.0.0';
-        description = 'Plugin without start';
+        readonly name = "NoStartPlugin";
+        version = "1.0.0";
+        description = "Plugin without start";
         install = vi.fn();
       }
 
@@ -120,11 +120,11 @@ describe('PluginManager', () => {
       expect(plugin.install).toHaveBeenCalledWith(mockApp, {});
     });
 
-    it('should handle plugins with neither install nor start methods', async () => {
+    it("should handle plugins with neither install nor start methods", async () => {
       class EmptyPlugin {
-        readonly name = 'EmptyPlugin';
-        version = '1.0.0';
-        description = 'Empty plugin';
+        readonly name = "EmptyPlugin";
+        version = "1.0.0";
+        description = "Empty plugin";
       }
 
       const plugin = new EmptyPlugin();
@@ -134,33 +134,33 @@ describe('PluginManager', () => {
       expect(pluginManager.getPlugins()).toContain(plugin);
     });
 
-    it('should throw error during install phase and not register plugin', async () => {
+    it("should throw error during install phase and not register plugin", async () => {
       class FailingPlugin {
-        readonly name = 'FailingPlugin';
-        version = '1.0.0';
-        description = 'Failing plugin';
+        readonly name = "FailingPlugin";
+        version = "1.0.0";
+        description = "Failing plugin";
         install = vi.fn().mockImplementation(() => {
-          throw new Error('Install failed');
+          throw new Error("Install failed");
         });
       }
 
       const plugin = new FailingPlugin();
 
       await expect(pluginManager.installPlugins([plugin]))
-        .rejects.toThrow('Install failed');
+        .rejects.toThrow("Install failed");
 
       // Plugin should NOT be registered since install failed
       expect(pluginManager.getPlugins()).not.toContain(plugin);
     });
 
-    it('should throw error during start phase but keep registered plugin', async () => {
+    it("should throw error during start phase but keep registered plugin", async () => {
       class FailingStartPlugin {
-        readonly name = 'FailingStartPlugin';
-        version = '1.0.0';
-        description = 'Failing start plugin';
+        readonly name = "FailingStartPlugin";
+        version = "1.0.0";
+        description = "Failing start plugin";
         install = vi.fn();
         start = vi.fn().mockImplementation(() => {
-          throw new Error('Start failed');
+          throw new Error("Start failed");
         });
       }
 
@@ -168,26 +168,26 @@ describe('PluginManager', () => {
 
       // Installation should succeed, but start should fail
       await expect(pluginManager.installPlugins([plugin]))
-        .rejects.toThrow('Start failed');
+        .rejects.toThrow("Start failed");
 
       // Plugin should be registered since install succeeded
       expect(pluginManager.getPlugins()).toContain(plugin);
     });
 
-    it('should log installation errors via serviceError', async () => {
+    it("should log installation errors via serviceError", async () => {
       class FailingPlugin {
-        readonly name = 'FailingPlugin';
-        version = '1.0.0';
-        description = 'Failing plugin';
+        readonly name = "FailingPlugin";
+        version = "1.0.0";
+        description = "Failing plugin";
         install = vi.fn().mockImplementation(() => {
-          throw new Error('Install failed');
+          throw new Error("Install failed");
         });
       }
 
       const plugin = new FailingPlugin();
 
       // Spy on serviceError
-      const serviceErrorSpy = vi.spyOn(mockApp, 'serviceError');
+      const serviceErrorSpy = vi.spyOn(mockApp, "serviceError");
 
       await expect(pluginManager.installPlugins([plugin]))
         .rejects.toThrow();
@@ -195,26 +195,26 @@ describe('PluginManager', () => {
       // Verify error was logged via serviceError
       expect(serviceErrorSpy).toHaveBeenCalledWith(
         pluginManager,
-        expect.stringContaining('Error installing plugin "FailingPlugin"'),
+        expect.stringContaining("Error installing plugin \"FailingPlugin\""),
         expect.any(Error)
       );
     });
 
-    it('should log start errors via serviceError', async () => {
+    it("should log start errors via serviceError", async () => {
       class FailingStartPlugin {
-        readonly name = 'FailingStartPlugin';
-        version = '1.0.0';
-        description = 'Failing start plugin';
+        readonly name = "FailingStartPlugin";
+        version = "1.0.0";
+        description = "Failing start plugin";
         install = vi.fn();
         start = vi.fn().mockImplementation(() => {
-          throw new Error('Start failed');
+          throw new Error("Start failed");
         });
       }
 
       const plugin = new FailingStartPlugin();
 
       // Spy on serviceError
-      const serviceErrorSpy = vi.spyOn(mockApp, 'serviceError');
+      const serviceErrorSpy = vi.spyOn(mockApp, "serviceError");
 
       await expect(pluginManager.installPlugins([plugin]))
         .rejects.toThrow();
@@ -222,36 +222,36 @@ describe('PluginManager', () => {
       // Verify error was logged via serviceError
       expect(serviceErrorSpy).toHaveBeenCalledWith(
         pluginManager,
-        expect.stringContaining('Error starting plugin "FailingStartPlugin"'),
+        expect.stringContaining("Error starting plugin \"FailingStartPlugin\""),
         expect.any(Error)
       );
     });
 
-    it('should process install phase before start phase', async () => {
+    it("should process install phase before start phase", async () => {
       const installCalls: string[] = [];
       const startCalls: string[] = [];
 
       class Plugin1 {
-        readonly name = 'Plugin1';
-        version = '1.0.0';
-        description = 'First plugin';
+        readonly name = "Plugin1";
+        version = "1.0.0";
+        description = "First plugin";
         install = vi.fn().mockImplementation(() => {
-          installCalls.push('Plugin1');
+          installCalls.push("Plugin1");
         });
         start = vi.fn().mockImplementation(async () => {
-          startCalls.push('Plugin1');
+          startCalls.push("Plugin1");
         });
       }
 
       class Plugin2 {
-        readonly name = 'Plugin2';
-        version = '1.0.0';
-        description = 'Second plugin';
+        readonly name = "Plugin2";
+        version = "1.0.0";
+        description = "Second plugin";
         install = vi.fn().mockImplementation(() => {
-          installCalls.push('Plugin2');
+          installCalls.push("Plugin2");
         });
         start = vi.fn().mockImplementation(async () => {
-          startCalls.push('Plugin2');
+          startCalls.push("Plugin2");
         });
       }
 
@@ -261,26 +261,26 @@ describe('PluginManager', () => {
       await pluginManager.installPlugins([plugin1, plugin2]);
 
       // All installs should complete before any starts
-      expect(installCalls).toEqual(['Plugin1', 'Plugin2']);
-      expect(startCalls).toEqual(['Plugin1', 'Plugin2']);
+      expect(installCalls).toEqual(["Plugin1", "Plugin2"]);
+      expect(startCalls).toEqual(["Plugin1", "Plugin2"]);
     });
   });
 
-  describe('Plugin Access', () => {
+  describe("Plugin Access", () => {
     beforeEach(() => {
       mockApp = createTestingApp();
       pluginManager = new PluginManager(mockApp);
     });
 
-    it('should return empty array when no plugins installed', () => {
+    it("should return empty array when no plugins installed", () => {
       expect(pluginManager.getPlugins()).toEqual([]);
     });
 
-    it('should return installed plugins', async () => {
+    it("should return installed plugins", async () => {
       class TestPlugin {
-        readonly name = 'TestPlugin';
-        version = '1.0.0';
-        description = 'Test plugin';
+        readonly name = "TestPlugin";
+        version = "1.0.0";
+        description = "Test plugin";
       }
 
       const plugin = new TestPlugin();

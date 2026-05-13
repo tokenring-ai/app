@@ -7,25 +7,25 @@ import type TokenRingApp from "./TokenRingApp.ts";
 
 export type TokenRingPlugin<ConfigType = void> = ConfigType extends void
   ? {
-    readonly name: string;
-    readonly displayName: string;
-    readonly version: string;
-    readonly description: string;
-    earlyInstall?: (app: TokenRingApp) => MaybePromise<void>;
-    install?: (app: TokenRingApp) => MaybePromise<void | undefined>;
-    start?: (app: TokenRingApp) => MaybePromise<void>;
-  }
+      readonly name: string;
+      readonly displayName: string;
+      readonly version: string;
+      readonly description: string;
+      earlyInstall?: (app: TokenRingApp) => MaybePromise<void>;
+      install?: (app: TokenRingApp) => MaybePromise<void | undefined>;
+      start?: (app: TokenRingApp) => MaybePromise<void>;
+    }
   : {
-    readonly name: string;
-    readonly displayName: string;
-    readonly version: string;
-    readonly description: string;
-    readonly config: ConfigType;
-    earlyInstall?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
-    install?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void | undefined>;
-    start?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
-    reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
-  };
+      readonly name: string;
+      readonly displayName: string;
+      readonly version: string;
+      readonly description: string;
+      readonly config: ConfigType;
+      earlyInstall?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
+      install?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void | undefined>;
+      start?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
+      reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
+    };
 
 export interface TokenRingService {
   readonly name: string;
@@ -42,8 +42,7 @@ export interface TokenRingService {
   detach?(agent: Agent): void;
 }
 
-export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {
-}
+export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {}
 
 export interface AppSessionCheckpoint {
   sessionId: string;
@@ -54,45 +53,54 @@ export interface AppSessionCheckpoint {
 }
 
 export type AppConfigItem =
-  {
-    type: "text";
-    description: string;
-    minLength?: number;
-    maxLength?: number;
-    required?: boolean;
-  } | {
-    type: "multilineText";
-    description: string;
-    minLength?: number;
-    maxLength?: number;
-    required?: boolean;
-  } | {
-    type: "number" | "slider";
-    description: string;
-    min?: number;
-    max?: number;
-    required?: boolean;
-    decimals?: number;
-  } | {
-    type: "checkbox";
-    description: string;
-    required?: boolean;
-  } | {
-    type: "date";
-    description: string;
-    required?: boolean;
-  } | {
-    type: "select";
-    description: string;
-    options: {
-      label: string;
-      value: string;
-    }[];
-  } | {
-    type: "categorySelect";
-    description: string;
-    categories: Record<string, {
-      label: string;
-      value: string;
-    }[]>;
-  };
+  | {
+      type: "text";
+      description: string;
+      minLength?: number;
+      maxLength?: number;
+      required?: boolean;
+    }
+  | {
+      type: "multilineText";
+      description: string;
+      minLength?: number;
+      maxLength?: number;
+      required?: boolean;
+    }
+  | {
+      type: "number" | "slider";
+      description: string;
+      min?: number;
+      max?: number;
+      required?: boolean;
+      decimals?: number;
+    }
+  | {
+      type: "checkbox";
+      description: string;
+      required?: boolean;
+    }
+  | {
+      type: "date";
+      description: string;
+      required?: boolean;
+    }
+  | {
+      type: "select";
+      description: string;
+      options: {
+        label: string;
+        value: string;
+      }[];
+    }
+  | {
+      type: "categorySelect";
+      description: string;
+      categories: Record<
+        string,
+        {
+          label: string;
+          value: string;
+        }[]
+      >;
+    };

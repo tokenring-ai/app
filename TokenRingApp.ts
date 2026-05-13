@@ -16,13 +16,17 @@ export type LogEntry = {
 };
 
 export default class TokenRingApp {
-  private readonly abortController = new AbortController();
-  private shutdownStartedAt?: number | undefined;
   readonly sessionId = generateHumanId();
   readonly stateManager = new StateManager<AppStateSlice<any>>();
   readonly runningServices = new Set<TokenRingService>();
   readonly stoppingServices = new Set<TokenRingService>();
   readonly backgroundTasks = new Map<string, number>();
+  services = new TypedRegistry<TokenRingService>();
+  requireService = this.services.requireItemByType;
+  getService = this.services.getItemByType;
+  getServices = this.services.getItems;
+  private readonly abortController = new AbortController();
+  private shutdownStartedAt?: number | undefined;
 
   constructor(readonly config: TokenRingAppConfig) {
     // Initialize the logs state slice
@@ -40,16 +44,6 @@ export default class TokenRingApp {
     }
   }
 
-  services = new TypedRegistry<TokenRingService>();
-
-  requireService = this.services.requireItemByType;
-  getService = this.services.getItemByType;
-  getServices = this.services.getItems;
-
-  addServices(...services: TokenRingService[]) {
-    this.services.register(...services);
-  }
-
   /**
    * Get the logs array
    */
@@ -57,14 +51,18 @@ export default class TokenRingApp {
     return this.stateManager.getState(AppLogsState).getLogs();
   }
 
+  get isShuttingDown(): boolean {
+    return this.abortController.signal.aborted;
+  }
+
+  addServices(...services: TokenRingService[]) {
+    this.services.register(...services);
+  }
+
   restoreState(state: AppSessionCheckpoint["state"]) {
     this.stateManager.deserialize(state, key => {
       this.log("info", `[TokenRingApp] Error while restoring state: State slice ${key} not found in app checkpoint`);
     });
-  }
-
-  get isShuttingDown(): boolean {
-    return this.abortController.signal.aborted;
   }
 
   /**
@@ -76,48 +74,6 @@ export default class TokenRingApp {
       this.abortController.abort(reason);
       this.log("info", `[TokenRingApp] Shutting down: ${reason}`);
     }
-  }
-
-  /**
-   * Returns a formatted status string describing what is still
-   * preventing shutdown from completing, or `undefined` if idle.
-   */
-  private describeBlockingWork(): string | undefined {
-    const lines: string[] = [];
-
-    for (const service of this.runningServices) {
-      lines.push(`  - ${service.name}: main loop still running`);
-    }
-    for (const service of this.stoppingServices) {
-      lines.push(`  - ${service.name}: stop handler still running`);
-    }
-    for (const [name, count] of this.backgroundTasks) {
-      if (count > 0) {
-        lines.push(`  - ${name}: ${count} background task(s) pending`);
-      }
-    }
-
-    if (lines.length === 0) return undefined;
-
-    const elapsed = this.shutdownStartedAt ? ((Date.now() - this.shutdownStartedAt) / 1000).toFixed(1) : "?";
-
-    return `App shutdown in progress (${elapsed}s):\n${lines.join("\n")}\n`;
-  }
-
-  /**
-   * Periodically logs shutdown progress until the returned
-   * cleanup function is called.
-   */
-  private startShutdownMonitor(): () => void {
-    const timer = setInterval(() => {
-      const status = this.describeBlockingWork();
-      if (status) {
-        process.stdout.write(status);
-      }
-    }, this.config.app.shutdownMonitorIntervalMs);
-    timer.unref?.();
-
-    return () => clearInterval(timer);
   }
 
   generateStateCheckpoint() {
@@ -211,17 +167,6 @@ export default class TokenRingApp {
     this.runNamedBackgroundTask(service.name, initiator);
   }
 
-  private runNamedBackgroundTask(name: string, initiator: (signal: AbortSignal) => Promise<void>): void {
-    const count = this.backgroundTasks.get(name) || 0;
-    this.backgroundTasks.set(name, count + 1);
-    initiator(this.abortController.signal)
-      .catch(err => this.namedError(name, "Error:", err))
-      .finally(() => {
-        const count = this.backgroundTasks.get(name) || 0;
-        this.backgroundTasks.set(name, count - 1);
-      });
-  }
-
   /**
    * Log a system message
    */
@@ -231,16 +176,6 @@ export default class TokenRingApp {
 
   serviceError(service: TokenRingService, ...messages: any[]): void {
     this.namedError(service.name, ...messages);
-  }
-
-  private namedOutput(name: string, ...messages: any[]): void {
-    const message = `[${name}] ${formatLogMessages(messages)}`;
-    this.log("info", message);
-  }
-
-  private namedError(name: string, ...messages: any[]): void {
-    const message = `[${name}] ${formatLogMessages(messages)}`;
-    this.log("error", message);
   }
 
   async *subscribeLogsAsync(position: number, signal: AbortSignal) {
@@ -264,6 +199,69 @@ export default class TokenRingApp {
     } catch (error: unknown) {
       throw new Error(`Invalid config value for key "${key}": ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * Returns a formatted status string describing what is still
+   * preventing shutdown from completing, or `undefined` if idle.
+   */
+  private describeBlockingWork(): string | undefined {
+    const lines: string[] = [];
+
+    for (const service of this.runningServices) {
+      lines.push(`  - ${service.name}: main loop still running`);
+    }
+    for (const service of this.stoppingServices) {
+      lines.push(`  - ${service.name}: stop handler still running`);
+    }
+    for (const [name, count] of this.backgroundTasks) {
+      if (count > 0) {
+        lines.push(`  - ${name}: ${count} background task(s) pending`);
+      }
+    }
+
+    if (lines.length === 0) return undefined;
+
+    const elapsed = this.shutdownStartedAt ? ((Date.now() - this.shutdownStartedAt) / 1000).toFixed(1) : "?";
+
+    return `App shutdown in progress (${elapsed}s):\n${lines.join("\n")}\n`;
+  }
+
+  /**
+   * Periodically logs shutdown progress until the returned
+   * cleanup function is called.
+   */
+  private startShutdownMonitor(): () => void {
+    const timer = setInterval(() => {
+      const status = this.describeBlockingWork();
+      if (status) {
+        process.stdout.write(status);
+      }
+    }, this.config.app.shutdownMonitorIntervalMs);
+    timer.unref?.();
+
+    return () => clearInterval(timer);
+  }
+
+  private runNamedBackgroundTask(name: string, initiator: (signal: AbortSignal) => Promise<void>): void {
+    const count = this.backgroundTasks.get(name) || 0;
+    this.backgroundTasks.set(name, count + 1);
+    initiator(this.abortController.signal)
+      .catch(err => this.namedError(name, "Error:", err))
+      .finally(() => {
+        const count = this.backgroundTasks.get(name) || 0;
+        this.backgroundTasks.set(name, count - 1);
+      });
+  }
+
+  private namedOutput(name: string, ...messages: any[]): void {
+    const message = `[${name}] ${formatLogMessages(messages)}`;
+    this.log("info", message);
+  }
+
+  private namedError(name: string, ...messages: any[]): void {
+    const message = `[${name}] ${formatLogMessages(messages)}`;
+    this.log("error", message);
   }
 
   private log(level: "info" | "error", message: string) {

@@ -46,7 +46,9 @@ The main application class that orchestrates services, configuration, and lifecy
 #### Constructor
 
 ```typescript
-constructor(readonly config: TokenRingAppConfig)
+constructor(readonly
+config: TokenRingAppConfig
+)
 ```
 
 | Parameter | Type               | Description                                     |
@@ -164,16 +166,21 @@ Stop the application by aborting the internal AbortController. Displays a progre
 running and background tasks. Automatically exits when all services have stopped.
 
 ```typescript
-async run(): Promise<void>
+async
+run()
+:
+Promise<void>
 ```
 
 Start all registered services and run the application lifecycle:
 
 1. Calls `start()` on all registered services
 2. Runs `run()` on all services that have it in a loop
- - If a service exits unexpectedly, it logs an error and restarts after 5 seconds
- - If a service throws an error, it logs the error and restarts after 5 seconds
- - Services continue running until the abort signal is triggered
+
+- If a service exits unexpectedly, it logs an error and restarts after 5 seconds
+- If a service throws an error, it logs the error and restarts after 5 seconds
+- Services continue running until the abort signal is triggered
+
 3. Calls `stop()` on all registered services when shutdown
 
 ```typescript
@@ -196,7 +203,10 @@ Type-safe state management with serialization support.
 #### Constructor
 
 ```typescript
-constructor(startingState: Record<string, unknown> = {})
+constructor(startingState
+:
+Record<string, unknown> = {}
+)
 ```
 
 | Parameter     | Type                    | Description                                         |
@@ -311,7 +321,10 @@ Manages plugin installation and lifecycle. Implements `TokenRingService`.
 #### Constructor
 
 ```typescript
-constructor(app: TokenRingApp)
+constructor(app
+:
+TokenRingApp
+)
 ```
 
 Creates a new PluginManager and automatically registers it as a service with the provided app.
@@ -396,10 +409,15 @@ Interface for services that can be registered with the application.
 interface TokenRingService {
   readonly name: string;
   readonly description: string;
+
   run?(signal: AbortSignal): MaybePromise<void>;
+
   start?(signal: AbortSignal): MaybePromise<void>;
+
   stop?(): MaybePromise<void>;
+
   attach?(agent: Agent, creationContext: AgentCreationContext): void;
+
   detach?(agent: Agent): void;
 }
 ```
@@ -466,9 +484,11 @@ abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> 
     public readonly name: string,
     public readonly serializationSchema: SerializationSchema
   )
+
   abstract serialize(): z.input<SerializationSchema>;
+
   abstract deserialize(data: z.output<SerializationSchema>): void;
-  
+
   getValidatedState(stateSnapshot: StateSnapshot): z.output<SerializationSchema> | null;
 }
 ```
@@ -612,7 +632,7 @@ console.log(app.isShuttingDown); // false
 ### Service Management
 
 ```typescript
-import TokenRingApp, { TokenRingService } from "@tokenring-ai/app";
+import TokenRingApp, {TokenRingService} from "@tokenring-ai/app";
 
 class MyService implements TokenRingService {
   name = "MyService";
@@ -722,8 +742,8 @@ await pluginManager.installPlugins([myPlugin]);
 
 ```typescript
 import StateManager from "@tokenring-ai/app/StateManager";
-import { SerializableStateSlice } from "@tokenring-ai/app/StateManager";
-import { z } from "zod";
+import {SerializableStateSlice} from "@tokenring-ai/app/StateManager";
+import {z} from "zod";
 
 const serializationSchema = z.object({
   name: z.string(),
@@ -892,7 +912,7 @@ if (restartRequired) {
 ### Background Task Management
 
 ```typescript
-import TokenRingApp, { TokenRingService } from "@tokenring-ai/app";
+import TokenRingApp, {TokenRingService} from "@tokenring-ai/app";
 
 class BackgroundService implements TokenRingService {
   name = "BackgroundService";
@@ -918,7 +938,7 @@ app.addServices(new BackgroundService());
 ### Service Auto-Restart
 
 ```typescript
-import TokenRingApp, { TokenRingService } from "@tokenring-ai/app";
+import TokenRingApp, {TokenRingService} from "@tokenring-ai/app";
 
 class UnstableService implements TokenRingService {
   name = "UnstableService";
@@ -967,7 +987,7 @@ app.restoreState(savedCheckpoint.state);
 ### Shutdown with Progress Indicator
 
 ```typescript
-import TokenRingApp, { TokenRingService } from "@tokenring-ai/app";
+import TokenRingApp, {TokenRingService} from "@tokenring-ai/app";
 
 class LongRunningService implements TokenRingService {
   name = "LongRunningService";
@@ -1127,7 +1147,7 @@ The application provides comprehensive error handling:
 Services are registered with the application using the `addServices` method:
 
 ```typescript
-import { TokenRingService } from "@tokenring-ai/app";
+import {TokenRingService} from "@tokenring-ai/app";
 
 class MyService implements TokenRingService {
   name = "MyService";

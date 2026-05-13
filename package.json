@@ -3,9 +3,9 @@
   "version": "0.2.0",
   "description": "Base app class for TokenRing applications, which provides a registry of services and an attachment point for plugins.",
   "dependencies": {
-    "@tokenring-ai/agent": "0.2.0",
-    "@tokenring-ai/utility": "0.2.0",
-    "@tokenring-ai/rpc": "0.2.0",
+    "@tokenring-ai/agent": "workspace:*",
+    "@tokenring-ai/utility": "workspace:*",
+    "@tokenring-ai/rpc": "workspace:*",
     "zod": "^4.3.6"
   },
   "exports": {
