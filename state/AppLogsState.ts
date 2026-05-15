@@ -31,7 +31,7 @@ export class AppLogsState extends AppStateSlice<typeof serializationSchema> {
   }
 
   deserialize(data: z.output<typeof serializationSchema>): void {
-    this.logs = data.logs ?? [];
+    this.logs = [...data.logs];
   }
 
   addLog(level: "info" | "error", message: string): void {

@@ -1,7 +1,7 @@
 {
   "name": "@tokenring-ai/app",
   "version": "0.2.0",
-  "description": "Base app class for TokenRing applications, which provides a registry of services and an attachment point for plugins.",
+  "description": "Base application framework for TokenRing applications, providing service management, plugin architecture, and state management through a unified interface.",
   "dependencies": {
     "@tokenring-ai/agent": "workspace:*",
     "@tokenring-ai/utility": "workspace:*",

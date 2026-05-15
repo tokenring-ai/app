@@ -1,12 +1,12 @@
+import deepClone from "@tokenring-ai/utility/object/deepClone";
 import fs from "node:fs";
 import path from "node:path";
-import deepMerge from "@tokenring-ai/utility/object/deepMerge";
 import { Glob, YAML } from "bun";
 import type { z } from "zod";
 import type { TokenRingAppConfigSchema } from "./schema.ts";
 
-export default function buildTokenRingAppConfig<T extends z.ZodTypeAny>(defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): z.output<T> {
-  const { dataDirectory, configDirectories, configSchema } = defaultConfig.app;
+export default function buildTokenRingAppConfig<T extends z.ZodTypeAny>(configSchema: T, defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): z.output<T> {
+  const { dataDirectory, configDirectories } = defaultConfig.app;
   if (!fs.existsSync(dataDirectory)) {
     fs.mkdirSync(dataDirectory);
   }
@@ -28,7 +28,7 @@ export default function buildTokenRingAppConfig<T extends z.ZodTypeAny>(defaultC
       for (const config of configs) {
         const configContent = fs.readFileSync(config, "utf-8");
         const parsedYaml = YAML.parse(configContent) as any;
-        mergedConfig = deepMerge(mergedConfig, parsedYaml);
+        mergedConfig = deepClone(mergedConfig, parsedYaml);
         parsedConfig = configSchema.parse(mergedConfig) as z.output<T>;
       }
     }
