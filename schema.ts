@@ -11,3 +11,14 @@ export const TokenRingAppConfigSchema = z.object({
 });
 export const LooseTokenRingAppConfigSchema = TokenRingAppConfigSchema.loose();
 export type TokenRingAppConfig = z.output<typeof LooseTokenRingAppConfigSchema>;
+
+
+export const AppSessionCheckpointSchema = z.object({
+  sessionId: z.string(),
+  createdAt: z.number(),
+  hostname: z.string(),
+  projectDirectory: z.string(),
+  state: z.record(z.string(), z.unknown()),
+});
+
+export type AppSessionCheckpoint = z.input<typeof AppSessionCheckpointSchema>

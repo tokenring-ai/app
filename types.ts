@@ -44,13 +44,6 @@ export interface TokenRingService {
 
 export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {}
 
-export interface AppSessionCheckpoint {
-  sessionId: string;
-  createdAt: number;
-  hostname: string;
-  projectDirectory: string;
-  state: Record<string, object>;
-}
 
 export type AppConfigItem =
   | {

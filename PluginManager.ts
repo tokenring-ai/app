@@ -1,8 +1,8 @@
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
+import { deepEquals } from "bun";
 import type { TokenRingAppConfig } from "./schema.ts";
 import type TokenRingApp from "./TokenRingApp";
 import type { TokenRingPlugin, TokenRingService } from "./types";
-import { deepEquals } from "bun";
 
 export default class PluginManager implements TokenRingService {
   readonly name = "PluginManager";

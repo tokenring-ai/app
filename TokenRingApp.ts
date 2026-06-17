@@ -1,13 +1,13 @@
-import process from "node:process";
-import { setTimeout as delay } from "node:timers/promises";
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import { generateHumanId } from "@tokenring-ai/utility/string/generateHumanId";
+import process from "node:process";
+import { setTimeout as delay } from "node:timers/promises";
 import type { z } from "zod";
-import StateManager from "./StateManager.ts";
-import type { TokenRingAppConfig } from "./schema.ts";
+import type { AppSessionCheckpoint, TokenRingAppConfig } from "./schema.ts";
 import { AppLogsState } from "./state/AppLogsState.ts";
-import type { AppSessionCheckpoint, AppStateSlice, TokenRingService } from "./types.ts";
+import StateManager from "./StateManager.ts";
+import type { AppStateSlice, TokenRingService } from "./types.ts";
 
 export type LogEntry = {
   timestamp: number;
@@ -254,13 +254,13 @@ export default class TokenRingApp {
       });
   }
 
-  private namedOutput(name: string, ...messages: any[]): void {
-    const message = `[${name}] ${formatLogMessages(messages)}`;
+  private namedOutput(name: string, ...messages: unknown[]): void {
+    const message = `[${name}] ${formatLogMessages(...messages)}`;
     this.log("info", message);
   }
 
-  private namedError(name: string, ...messages: any[]): void {
-    const message = `[${name}] ${formatLogMessages(messages)}`;
+  private namedError(name: string, ...messages: unknown[]): void {
+    const message = `[${name}] ${formatLogMessages(...messages)}`;
     this.log("error", message);
   }
 
