@@ -1,6 +1,7 @@
 import type TokenRingApp from "@tokenring-ai/app";
 import { createRPCEndpoint } from "@tokenring-ai/rpc/createRPCEndpoint";
 import PluginManager from "../PluginManager.ts";
+import { AppLogsState } from "../state/AppLogsState.ts";
 import AppRpcSchema from "./schema.ts";
 
 export default createRPCEndpoint(AppRpcSchema, {
@@ -18,5 +19,15 @@ export default createRPCEndpoint(AppRpcSchema, {
   },
   getLogs(_args, app: TokenRingApp) {
     return { logs: app.logs };
+  },
+
+  async *streamLogs(args, app: TokenRingApp, signal) {
+    let position = args.fromPosition ?? 0;
+
+    for await (const state of app.stateManager.subscribeAsync(AppLogsState, signal)) {
+      const logs = state.logs.slice(position);
+      position = state.logs.length;
+      yield { logs, position };
+    }
   },
 });
