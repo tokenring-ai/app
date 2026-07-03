@@ -44,7 +44,6 @@ export interface TokenRingService {
 
 export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {}
 
-
 export type AppConfigItem =
   | {
       type: "text";

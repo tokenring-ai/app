@@ -5,7 +5,10 @@ import path from "node:path";
 import type { z } from "zod";
 import type { TokenRingAppConfigSchema } from "./schema.ts";
 
-export default async function buildTokenRingAppConfig<T extends z.ZodTypeAny>(configSchema: T, defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>): Promise<z.output<T>> {
+export default async function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
+  configSchema: T,
+  defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>,
+): Promise<z.output<T>> {
   const { dataDirectory, configDirectories } = defaultConfig.app;
   if (!fs.existsSync(dataDirectory)) {
     fs.mkdirSync(dataDirectory);
