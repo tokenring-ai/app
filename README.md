@@ -36,7 +36,7 @@ This package depends on:
 - `@tokenring-ai/agent` (workspace:*) - Core agent orchestration
 - `@tokenring-ai/utility` (workspace:*) - Shared utilities and helpers
 - `@tokenring-ai/rpc` (workspace:*) - RPC infrastructure
-- `zod` (^4.3.6) - Type validation
+- `zod` (^4.4.3) - Type validation
 
 **Dev Dependencies:**
 
@@ -424,6 +424,22 @@ const AppRpcSchema = {
         ),
       }),
     },
+    streamLogs: {
+      type: "stream" as const,
+      input: z.object({
+        fromPosition: z.number().optional().default(0),
+      }),
+      result: z.object({
+        logs: z.array(
+          z.object({
+            timestamp: z.number(),
+            level: z.enum(["info", "error"]),
+            message: z.string(),
+          }),
+        ),
+        position: z.number(),
+      }),
+    },
   },
 };
 ```
@@ -465,6 +481,31 @@ Returns all log entries from the application.
   }>;
 }
 ```
+
+#### streamLogs
+
+Streams log entries from the application starting from a given position.
+
+**Input**:
+```typescript
+{
+  fromPosition?: number; // defaults to 0
+}
+```
+
+**Output**:
+```typescript
+{
+  logs: Array<{
+    timestamp: number;
+    level: "info" | "error";
+    message: string;
+  }>;
+  position: number; // The position after the last log entry
+}
+```
+
+This is a streaming endpoint that yields new log entries as they are added.
 
 ## Types
 
@@ -639,6 +680,36 @@ interface LogEntry {
   timestamp: number;
   level: "info" | "error";
   message: string;
+}
+```
+
+Defined in both `TokenRingApp.ts` and `AppLogsState.ts` for consistency.
+
+### ConfigurationError
+
+Error class for configuration-related errors.
+
+```typescript
+class ConfigurationError extends Error {
+  constructor(
+    public readonly serviceName: string,
+    readonly message: string,
+    readonly options?: ErrorOptions,
+  )
+}
+```
+
+### NotImplementedError
+
+Error class for not implemented functionality.
+
+```typescript
+class NotImplementedError extends Error {
+  constructor(
+    public readonly providerOrServiceName: string,
+    readonly message: string,
+    readonly options?: ErrorOptions,
+  )
 }
 ```
 
@@ -1357,6 +1428,29 @@ bun run build
 - Ensure Zod schema validation for all configuration
 - Update documentation for new features
 - Test with multiple service configurations
+
+## Package Exports
+
+The package exports the following from `index.ts`:
+
+```typescript
+// Default export
+import TokenRingApp from "@tokenring-ai/app";
+
+// Named exports
+import { PluginManager } from "@tokenring-ai/app";
+import type { TokenRingPlugin } from "@tokenring-ai/app";
+
+// Additional exports from subpaths
+import StateManager from "@tokenring-ai/app/StateManager";
+import { AppStateSlice } from "@tokenring-ai/app/types";
+import { ConfigurationError, NotImplementedError } from "@tokenring-ai/app/types";
+import buildTokenRingAppConfig from "@tokenring-ai/app/buildTokenRingAppConfig";
+import { TokenRingAppConfigSchema, AppSessionCheckpointSchema } from "@tokenring-ai/app/schema";
+import AppRpcSchema from "@tokenring-ai/app/rpc/schema";
+import appRpcEndpoint from "@tokenring-ai/app/rpc/app";
+import { AppLogsState } from "@tokenring-ai/app/state/AppLogsState";
+```
 
 ## License
 
