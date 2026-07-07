@@ -62,8 +62,8 @@ export default class PluginManager implements TokenRingService {
     for (const plugin of plugins) {
       const hasConfig = "config" in plugin;
       if (hasConfig) {
-        const prevConfigSlice = plugin.config.parse(this.app.config);
-        const newConfigSlice = plugin.config.parse(newConfig);
+        const prevConfigSlice = plugin.config.parse(this.app.config) as unknown;
+        const newConfigSlice = plugin.config.parse(newConfig) as unknown;
 
         if (!deepEquals(prevConfigSlice, newConfigSlice, true)) {
           if (plugin.reconfigure) {

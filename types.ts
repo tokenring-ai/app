@@ -42,6 +42,26 @@ export interface TokenRingService {
   detach?(agent: Agent): void;
 }
 
+export class ConfigurationError extends Error {
+  constructor(
+    public readonly serviceName: string,
+    readonly message: string,
+    readonly options?: ErrorOptions,
+  ) {
+    super(`[${serviceName}: ${message}]`, options);
+  }
+}
+
+export class NotImplementedError extends Error {
+  constructor(
+    public readonly providerOrServiceName: string,
+    readonly message: string,
+    readonly options?: ErrorOptions,
+  ) {
+    super(`[${providerOrServiceName}: ${message}]`, options);
+  }
+}
+
 export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {}
 
 export type AppConfigItem =

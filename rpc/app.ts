@@ -22,7 +22,7 @@ export default createRPCEndpoint(AppRpcSchema, {
   },
 
   async *streamLogs(args, app: TokenRingApp, signal) {
-    let position = args.fromPosition ?? 0;
+    let position = args.fromPosition;
 
     for await (const state of app.stateManager.subscribeAsync(AppLogsState, signal)) {
       const logs = state.logs.slice(position);

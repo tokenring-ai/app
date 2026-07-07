@@ -1,7 +1,7 @@
-import deepClone from "@tokenring-ai/utility/object/deepClone";
-import { file, Glob, YAML } from "bun";
 import fs from "node:fs";
 import path from "node:path";
+import deepClone from "@tokenring-ai/utility/object/deepClone";
+import { file, Glob, YAML } from "bun";
 import type { z } from "zod";
 import type { TokenRingAppConfigSchema } from "./schema.ts";
 
@@ -30,8 +30,8 @@ export default async function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
       const configs = glob.scan({ cwd: dir, absolute: true });
       for await (const config of configs) {
         const configContent = await file(config).text();
-        const parsedYaml = YAML.parse(configContent) as any;
-        mergedConfig = deepClone(mergedConfig, parsedYaml);
+        const parsedYaml = YAML.parse(configContent);
+        mergedConfig = deepClone(mergedConfig, parsedYaml as {});
         parsedConfig = configSchema.parse(mergedConfig) as z.output<T>;
       }
     }

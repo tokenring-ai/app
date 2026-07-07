@@ -37,7 +37,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
   }
 
   mutateState<R, T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: T) => R): R {
-    const state = this.state.get(ClassType) as T;
+    const state = this.state.get(ClassType) as T | undefined;
     if (!state) {
       throw new Error(`State slice ${ClassType.name} not found`);
     }
@@ -163,7 +163,8 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     });
 
     try {
-      while (!isComplete && !signal?.aborted) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
+      while (!isComplete && !signal.aborted) {
         // Wait for next item in queue
         if (latestItem === null) {
           await new Promise<void>(resolve => {
@@ -172,7 +173,8 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
         }
 
         // Yield  queued items
-        if (latestItem && !signal?.aborted) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
+        if (latestItem && !signal.aborted) {
           const item = latestItem;
           latestItem = null;
           yield item;

@@ -1,12 +1,12 @@
+import process from "node:process";
+import { setTimeout as delay } from "node:timers/promises";
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import { generateHumanId } from "@tokenring-ai/utility/string/generateHumanId";
-import process from "node:process";
-import { setTimeout as delay } from "node:timers/promises";
 import type { z } from "zod";
+import StateManager from "./StateManager.ts";
 import type { AppSessionCheckpoint, TokenRingAppConfig } from "./schema.ts";
 import { AppLogsState } from "./state/AppLogsState.ts";
-import StateManager from "./StateManager.ts";
 import type { AppStateSlice, TokenRingService } from "./types.ts";
 
 export type LogEntry = {
@@ -100,15 +100,18 @@ export default class TokenRingApp {
               try {
                 await service.run(signal);
                 // If run() completes without error but we aren't aborted, it exited "normally"
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
                 if (!signal.aborted) {
                   this.serviceError(service, `Exited unexpectedly. Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
                 }
-              } catch (err: unknown) {
+              } catch (err) {
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
                 if (!signal.aborted) {
                   this.serviceError(service, `Died with error:`, err, `Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
                 }
               }
 
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
               if (signal.aborted) break;
               await delay(this.config.app.serviceRestartDelayMs, null, {
                 signal,
@@ -119,7 +122,7 @@ export default class TokenRingApp {
           }
         }),
       );
-    } catch (err: unknown) {
+    } catch (err) {
       runError = err;
       this.shutdown(err instanceof Error ? err.message : "App run failed");
     } finally {
@@ -238,7 +241,7 @@ export default class TokenRingApp {
         process.stdout.write(status);
       }
     }, this.config.app.shutdownMonitorIntervalMs);
-    timer.unref?.();
+    timer.unref();
 
     return () => clearInterval(timer);
   }
