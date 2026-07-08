@@ -2,7 +2,7 @@ import { setTimeout as delay } from "timers/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TokenRingApp from "../TokenRingApp";
 import type { TokenRingService } from "../types";
-import createTestingApp from "./createTestingApp";
+import createTestingApp from "./createTestingApp.test";
 
 describe("TokenRingApp", () => {
   let app: TokenRingApp;

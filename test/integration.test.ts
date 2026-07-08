@@ -4,7 +4,7 @@ import PluginManager from "../PluginManager";
 import StateManager from "../StateManager";
 import TokenRingApp from "../TokenRingApp";
 import type { TokenRingPlugin, TokenRingService } from "../types";
-import createTestingApp from "./createTestingApp";
+import createTestingApp from "./createTestingApp.test";
 
 describe("App Integration Tests", () => {
   let app: TokenRingApp;

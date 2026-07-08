@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PluginManager from "../PluginManager";
 import TokenRingApp from "../TokenRingApp";
-import createTestingApp from "./createTestingApp";
+import createTestingApp from "./createTestingApp.test";
 
 describe("PluginManager", () => {
   let mockApp: TokenRingApp;

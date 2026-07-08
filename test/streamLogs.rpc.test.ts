@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import appRpc from "../rpc/app.ts";
-import createTestingApp from "./createTestingApp";
+import createTestingApp from "./createTestingApp.test";
 
 describe("streamLogs RPC", () => {
   it("streams incremental log chunks with position", async () => {
