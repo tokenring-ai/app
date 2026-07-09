@@ -52,7 +52,7 @@ describe("TokenRingApp", () => {
         level: "info",
         message: expect.stringContaining("Test message")
       });
-      expect(app.logs[0].message).toContain("[TestService]");
+      expect(app.logs[0]?.message).toContain("[TestService]");
     });
 
     it("should log service error messages", () => {
@@ -69,7 +69,7 @@ describe("TokenRingApp", () => {
         level: "error",
         message: expect.stringContaining("Error message")
       });
-      expect(app.logs[0].message).toContain("[TestService]");
+      expect(app.logs[0]?.message).toContain("[TestService]");
     });
 
     it("should format multiple log messages", () => {
@@ -79,10 +79,10 @@ describe("TokenRingApp", () => {
       };
       app.serviceOutput(mockService, "Message", "part", "2");
 
-      expect(app.logs[0].message).toContain("[TestService]");
-      expect(app.logs[0].message).toContain("Message");
-      expect(app.logs[0].message).toContain("part");
-      expect(app.logs[0].message).toContain("2");
+      expect(app.logs[0]?.message).toContain("[TestService]");
+      expect(app.logs[0]?.message).toContain("Message");
+      expect(app.logs[0]?.message).toContain("part");
+      expect(app.logs[0]?.message).toContain("2");
     });
   });
 
@@ -100,8 +100,8 @@ describe("TokenRingApp", () => {
       await delay(10);
 
       expect(app.logs).toHaveLength(1);
-      expect(app.logs[0].level).toBe("error");
-      expect(app.logs[0].message).toContain("Test error");
+      expect(app.logs[0]?.level).toBe("error");
+      expect(app.logs[0]?.message).toContain("Test error");
     });
   });
 
@@ -114,8 +114,10 @@ describe("TokenRingApp", () => {
       const config = {
         app: {
           dataDirectory: "/tmp",
-          configFileName: "config",
-          configSchema: {} as any,
+          configDirectories: [],
+          shutdownMonitorIntervalMs: 2000,
+          serviceRestartDelayMs: 5000,
+          printLogs: false,
         },
         testKey: "test value"
       };
@@ -137,8 +139,10 @@ describe("TokenRingApp", () => {
       const config = {
         app: {
           dataDirectory: "/tmp",
-          configFileName: "config",
-          configSchema: {} as any,
+          configDirectories: [],
+          shutdownMonitorIntervalMs: 2000,
+          serviceRestartDelayMs: 5000,
+          printLogs: false,
         },
         testKey: "test value"
       };
@@ -202,7 +206,7 @@ describe("TokenRingApp", () => {
 
       await Promise.all([
         app.run(),
-        setTimeout(100).then(() => app.shutdown())
+        delay(100).then(() => app.shutdown())
       ]);
 
       expect(mockService1.run).toHaveBeenCalled();

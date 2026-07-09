@@ -45,6 +45,7 @@ describe("PluginManager", () => {
     it("should install single plugin successfully", async () => {
       class TestPlugin {
         readonly name = "TestPlugin";
+        readonly displayName = "TestPlugin";
         version = "1.0.0";
         description = "A test plugin";
         install = vi.fn();
@@ -63,6 +64,7 @@ describe("PluginManager", () => {
     it("should install multiple plugins", async () => {
       class Plugin1 {
         readonly name = "Plugin1";
+        readonly displayName = "Plugin1";
         version = "1.0.0";
         description = "First plugin";
         install = vi.fn();
@@ -71,6 +73,7 @@ describe("PluginManager", () => {
 
       class Plugin2 {
         readonly name = "Plugin2";
+        readonly displayName = "Plugin2";
         version = "1.0.0";
         description = "Second plugin";
         install = vi.fn();
@@ -91,6 +94,7 @@ describe("PluginManager", () => {
     it("should handle plugins without optional install method", async () => {
       class MinimalPlugin {
         readonly name = "MinimalPlugin";
+        readonly displayName = "MinimalPlugin";
         version = "1.0.0";
         description = "Minimal plugin";
         start = vi.fn().mockResolvedValue(undefined);
@@ -107,6 +111,7 @@ describe("PluginManager", () => {
     it("should handle plugins without optional start method", async () => {
       class NoStartPlugin {
         readonly name = "NoStartPlugin";
+        readonly displayName = "NoStartPlugin";
         version = "1.0.0";
         description = "Plugin without start";
         install = vi.fn();
@@ -123,6 +128,7 @@ describe("PluginManager", () => {
     it("should handle plugins with neither install nor start methods", async () => {
       class EmptyPlugin {
         readonly name = "EmptyPlugin";
+        readonly displayName = "EmptyPlugin";
         version = "1.0.0";
         description = "Empty plugin";
       }
@@ -137,6 +143,7 @@ describe("PluginManager", () => {
     it("should throw error during install phase and not register plugin", async () => {
       class FailingPlugin {
         readonly name = "FailingPlugin";
+        readonly displayName = "FailingPlugin";
         version = "1.0.0";
         description = "Failing plugin";
         install = vi.fn().mockImplementation(() => {
@@ -156,6 +163,7 @@ describe("PluginManager", () => {
     it("should throw error during start phase but keep registered plugin", async () => {
       class FailingStartPlugin {
         readonly name = "FailingStartPlugin";
+        readonly displayName = "FailingStartPlugin";
         version = "1.0.0";
         description = "Failing start plugin";
         install = vi.fn();
@@ -177,6 +185,7 @@ describe("PluginManager", () => {
     it("should log installation errors via serviceError", async () => {
       class FailingPlugin {
         readonly name = "FailingPlugin";
+        readonly displayName = "FailingPlugin";
         version = "1.0.0";
         description = "Failing plugin";
         install = vi.fn().mockImplementation(() => {
@@ -203,6 +212,7 @@ describe("PluginManager", () => {
     it("should log start errors via serviceError", async () => {
       class FailingStartPlugin {
         readonly name = "FailingStartPlugin";
+        readonly displayName = "FailingStartPlugin";
         version = "1.0.0";
         description = "Failing start plugin";
         install = vi.fn();
@@ -233,6 +243,7 @@ describe("PluginManager", () => {
 
       class Plugin1 {
         readonly name = "Plugin1";
+        readonly displayName = "Plugin1";
         version = "1.0.0";
         description = "First plugin";
         install = vi.fn().mockImplementation(() => {
@@ -245,6 +256,7 @@ describe("PluginManager", () => {
 
       class Plugin2 {
         readonly name = "Plugin2";
+        readonly displayName = "Plugin2";
         version = "1.0.0";
         description = "Second plugin";
         install = vi.fn().mockImplementation(() => {
@@ -279,6 +291,7 @@ describe("PluginManager", () => {
     it("should return installed plugins", async () => {
       class TestPlugin {
         readonly name = "TestPlugin";
+        readonly displayName = "TestPlugin";
         version = "1.0.0";
         description = "Test plugin";
       }

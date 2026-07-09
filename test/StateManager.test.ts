@@ -248,7 +248,7 @@ describe("StateManager", () => {
       });
 
       expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback.mock.calls[0][0].data).toBe("changed");
+      expect(callback.mock.calls[0]?.[0]?.data).toBe("changed");
 
       unsubscribe();
     });

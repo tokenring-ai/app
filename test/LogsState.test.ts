@@ -1,70 +1,81 @@
 import { describe, expect, it } from "vitest";
-import { AppLogsState } from "../state/AppLogsState";
+import type { LogEntry } from "../TokenRingApp";
 import TokenRingApp from "../TokenRingApp";
+import type { TokenRingService } from "../types";
+
+const testService: TokenRingService = { name: "App", description: "App" };
 
 describe("TokenRingApp Logs State", () => {
   it("should store logs in state manager", () => {
     const app = new TokenRingApp({
       app: {
         dataDirectory: "/tmp",
-        configFileName: "config",
-        configSchema: {} as any,
+        configDirectories: [],
+        shutdownMonitorIntervalMs: 2000,
+        serviceRestartDelayMs: 5000,
+        printLogs: false,
       }
     });
 
     // Add a log
-    app.serviceOutput(app, "Test message");
+    app.serviceOutput(testService, "Test message");
 
     // Verify log is in the state
     expect(app.logs).toHaveLength(1);
-    expect(app.logs[0].message).toContain("Test message");
-    expect(app.logs[0].level).toBe("info");
+    expect(app.logs[0]?.message).toContain("Test message");
+    expect(app.logs[0]?.level).toBe("info");
   });
 
   it("should persist logs in checkpoint", () => {
     const app = new TokenRingApp({
       app: {
         dataDirectory: "/tmp",
-        configFileName: "config",
-        configSchema: {} as any,
+        configDirectories: [],
+        shutdownMonitorIntervalMs: 2000,
+        serviceRestartDelayMs: 5000,
+        printLogs: false,
       }
     });
 
     // Add some logs
-    app.serviceOutput(app, "Info message");
-    app.serviceError(app, "Error message");
+    app.serviceOutput(testService, "Info message");
+    app.serviceError(testService, "Error message");
 
     // Generate checkpoint
     const checkpoint = app.generateStateCheckpoint();
 
     // Verify logs are in checkpoint
     expect(checkpoint).toHaveProperty("AppLogsState");
-    expect(checkpoint.AppLogsState).toHaveProperty("logs");
-    expect(checkpoint.AppLogsState.logs).toHaveLength(2);
-    expect(checkpoint.AppLogsState.logs[0].message).toContain("Info message");
-    expect(checkpoint.AppLogsState.logs[1].message).toContain("Error message");
-    expect(checkpoint.AppLogsState.logs[1].level).toBe("error");
+    const appLogsCheckpoint = checkpoint.AppLogsState as { logs: LogEntry[] };
+    expect(appLogsCheckpoint.logs).toHaveLength(2);
+    expect(appLogsCheckpoint.logs[0]?.message).toContain("Info message");
+    expect(appLogsCheckpoint.logs[1]?.message).toContain("Error message");
+    expect(appLogsCheckpoint.logs[1]?.level).toBe("error");
   });
 
   it("should restore logs from checkpoint", () => {
     const app1 = new TokenRingApp({
       app: {
         dataDirectory: "/tmp",
-        configFileName: "config",
-        configSchema: {} as any,
+        configDirectories: [],
+        shutdownMonitorIntervalMs: 2000,
+        serviceRestartDelayMs: 5000,
+        printLogs: false,
       }
     });
 
     // Add logs to first app
-    app1.serviceOutput(app1, "Restored message");
+    app1.serviceOutput(testService, "Restored message");
     const checkpoint = app1.generateStateCheckpoint();
 
     // Create second app and restore state
     const app2 = new TokenRingApp({
       app: {
         dataDirectory: "/tmp",
-        configFileName: "config",
-        configSchema: {} as any,
+        configDirectories: [],
+        shutdownMonitorIntervalMs: 2000,
+        serviceRestartDelayMs: 5000,
+        printLogs: false,
       }
     });
 
@@ -72,6 +83,6 @@ describe("TokenRingApp Logs State", () => {
 
     // Verify logs were restored
     expect(app2.logs).toHaveLength(1);
-    expect(app2.logs[0].message).toContain("Restored message");
+    expect(app2.logs[0]?.message).toContain("Restored message");
   });
 });

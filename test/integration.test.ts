@@ -33,6 +33,7 @@ describe("App Integration Tests", () => {
 
       class TestPlugin implements TokenRingPlugin<undefined> {
         readonly name = "IntegrationTestPlugin";
+        readonly displayName = "IntegrationTestPlugin";
         version = "1.0.0";
         description = "Integration test plugin";
         install = (app: TokenRingApp) => {
@@ -61,6 +62,7 @@ describe("App Integration Tests", () => {
 
       class Plugin1 implements TokenRingPlugin<undefined> {
         readonly name = "Plugin1";
+        readonly displayName = "Plugin1";
         version = "1.0.0";
         description = "First plugin";
         install = (app: TokenRingApp) => {
@@ -70,22 +72,24 @@ describe("App Integration Tests", () => {
 
       class Plugin2 implements TokenRingPlugin<undefined> {
         readonly name = "Plugin2";
+        readonly displayName = "Plugin2";
         version = "1.0.0";
         description = "Second plugin";
         start = async (app: TokenRingApp) => {
-          app.serviceOutput(this, "Plugin2 started");
+          app.serviceOutput({ name: this.name, description: this.description }, "Plugin2 started");
         };
       }
 
       class Plugin3 implements TokenRingPlugin<undefined> {
         readonly name = "Plugin3";
+        readonly displayName = "Plugin3";
         version = "1.0.0";
         description = "Third plugin";
         install = (app: TokenRingApp) => {
-          app.serviceOutput(this, "Plugin3 installed");
+          app.serviceOutput({ name: this.name, description: this.description }, "Plugin3 installed");
         };
         start = async (app: TokenRingApp) => {
-          app.serviceOutput(this, "Plugin3 started");
+          app.serviceOutput({ name: this.name, description: this.description }, "Plugin3 started");
         };
       }
 
@@ -111,14 +115,6 @@ describe("App Integration Tests", () => {
 
     beforeEach(() => {
       stateManager = new StateManager();
-    });
-
-    it("should integrate state management with app services", () => {
-      // Add StateManager as a service
-      app.addServices(stateManager);
-
-      const services = app.getServices();
-      expect(services).toContain(stateManager);
     });
 
     it("should handle state serialization in app context", () => {
@@ -152,7 +148,7 @@ describe("App Integration Tests", () => {
       });
 
       const modifiedSerialized = stateManager.serialize();
-      expect(modifiedSerialized.TestStateSlice.data).toBe("modified data");
+      expect((modifiedSerialized.TestStateSlice as { data: string })?.data).toBe("modified data");
     });
 
     it("should handle state subscriptions in app context", async () => {
@@ -219,13 +215,14 @@ describe("App Integration Tests", () => {
 
       class WorkflowPlugin implements TokenRingPlugin<undefined> {
         readonly name = "WorkflowPlugin";
+        readonly displayName = "WorkflowPlugin";
         version = "1.0.0";
         description = "Workflow plugin";
         install = (app: TokenRingApp) => {
-          app.serviceOutput(this, "Plugin installed in workflow");
+          app.serviceOutput({ name: this.name, description: this.description }, "Plugin installed in workflow");
         };
         start = async (app: TokenRingApp) => {
-          app.serviceOutput(this, "Plugin started in workflow");
+          app.serviceOutput({ name: this.name, description: this.description }, "Plugin started in workflow");
         };
       }
 
@@ -293,7 +290,7 @@ describe("App Integration Tests", () => {
     });
 
     it("should maintain state across service lifecycle", async () => {
-      const stateManager = new StateManager();
+      const stateManager = new StateManager<any>();
 
       class AppState {
         readonly name = "AppState";
@@ -324,9 +321,6 @@ describe("App Integration Tests", () => {
 
       stateManager.initializeState(AppState, {});
 
-      // Add state manager as service
-      app.addServices(stateManager);
-
       // Initialize state
       stateManager.mutateState(AppState, (state) => {
         state.initialize();
@@ -350,8 +344,10 @@ describe("App Integration Tests", () => {
       const config = {
         app: {
           dataDirectory: "/tmp",
-          configFileName: "config",
-          configSchema: {} as any,
+          configDirectories: [],
+          shutdownMonitorIntervalMs: 2000,
+          serviceRestartDelayMs: 5000,
+          printLogs: false,
         },
         database: { url: "default://url" },
         logging: { level: "info" }
@@ -362,8 +358,10 @@ describe("App Integration Tests", () => {
       expect(appWithConfig.config).toEqual({
         app: {
           dataDirectory: "/tmp",
-          configFileName: "config",
-          configSchema: {} as any,
+          configDirectories: [],
+          shutdownMonitorIntervalMs: 2000,
+          serviceRestartDelayMs: 5000,
+          printLogs: false,
         },
         database: { url: "default://url" },
         logging: { level: "info" }
@@ -374,6 +372,7 @@ describe("App Integration Tests", () => {
 
       class ConfigTestPlugin implements TokenRingPlugin<undefined> {
         readonly name = "ConfigTestPlugin";
+        readonly displayName = "ConfigTestPlugin";
         version = "1.0.0";
         description = "Config test plugin";
         install = (app: TokenRingApp) => {
@@ -410,7 +409,7 @@ describe("App Integration Tests", () => {
       app.addServices(errorService);
       await Promise.all([
         app.run(),
-        setTimeout(100).then(() => app.shutdown())
+        delay(100).then(() => app.shutdown())
       ]);
 
       expect(errorService.run).toHaveBeenCalled();
@@ -419,6 +418,7 @@ describe("App Integration Tests", () => {
     it("should handle plugin installation errors without breaking app", async () => {
       class FailingPlugin implements TokenRingPlugin<undefined> {
         readonly name = "FailingPlugin";
+        readonly displayName = "FailingPlugin";
         version = "1.0.0";
         description = "Plugin that fails to install";
         install = () => {
@@ -428,6 +428,7 @@ describe("App Integration Tests", () => {
 
       class WorkingPlugin implements TokenRingPlugin<undefined> {
         readonly name = "WorkingPlugin";
+        readonly displayName = "WorkingPlugin";
         version = "1.0.0";
         description = "Working plugin";
         install = (app: TokenRingApp) => {
@@ -459,6 +460,7 @@ describe("App Integration Tests", () => {
 
       class ConcurrentPlugin1 implements TokenRingPlugin<undefined> {
         readonly name = "ConcurrentPlugin1";
+        readonly displayName = "ConcurrentPlugin1";
         version = "1.0.0";
         description = "First concurrent plugin";
         install = (app: TokenRingApp) => {
@@ -468,6 +470,7 @@ describe("App Integration Tests", () => {
 
       class ConcurrentPlugin2 implements TokenRingPlugin<undefined> {
         readonly name = "ConcurrentPlugin2";
+        readonly displayName = "ConcurrentPlugin2";
         version = "1.0.0";
         description = "Second concurrent plugin";
         install = (app: TokenRingApp) => {
@@ -477,6 +480,7 @@ describe("App Integration Tests", () => {
 
       class ConcurrentPlugin3 implements TokenRingPlugin<undefined> {
         readonly name = "ConcurrentPlugin3";
+        readonly displayName = "ConcurrentPlugin3";
         version = "1.0.0";
         description = "Third concurrent plugin";
         install = (app: TokenRingApp) => {
@@ -521,7 +525,7 @@ describe("App Integration Tests", () => {
     });
 
     it("should handle state synchronization across components", () => {
-      const stateManager = new StateManager();
+      const stateManager = new StateManager<any>();
 
       class SharedState {
         readonly name = "SharedState";
@@ -541,9 +545,6 @@ describe("App Integration Tests", () => {
       }
 
       stateManager.initializeState(SharedState, {});
-
-      // Component 1: Sets state
-      app.addServices(stateManager);
 
       stateManager.mutateState(SharedState, (state) => {
         state.setValue("initial");

@@ -4,8 +4,10 @@ export default function createTestingApp() {
   return new TokenRingApp({
     app: {
       dataDirectory: "/tmp",
-      configFileName: "config",
-      configSchema: {} as any,
+      configDirectories: [],
+      shutdownMonitorIntervalMs: 2000,
+      serviceRestartDelayMs: 5000,
+      printLogs: false,
     }
   });
 }

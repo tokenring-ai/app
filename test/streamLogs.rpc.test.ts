@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
+import type { LogEntry } from "../TokenRingApp";
+import TokenRingApp from "../TokenRingApp";
 import appRpc from "../rpc/app.ts";
 import createTestingApp from "./createTestingApp.test";
+
+type StreamResult = { logs: LogEntry[]; position: number };
 
 describe("streamLogs RPC", () => {
   it("streams incremental log chunks with position", async () => {
     const app = createTestingApp();
     const controller = new AbortController();
-    const stream = appRpc.methods.streamLogs.execute({ fromPosition: 0 }, app, controller.signal);
+    const streamLogs = appRpc.methods.streamLogs!.execute as (
+      args: { fromPosition: number },
+      app: TokenRingApp,
+      signal: AbortSignal,
+    ) => AsyncGenerator<StreamResult>;
+    const stream = streamLogs({ fromPosition: 0 }, app, controller.signal);
 
     const first = await stream.next();
     expect(first.value).toEqual({ logs: [], position: 0 });
