@@ -8,6 +8,6 @@ export default function createTestingApp() {
       shutdownMonitorIntervalMs: 2000,
       serviceRestartDelayMs: 5000,
       printLogs: false,
-    },
+    }
   });
 }

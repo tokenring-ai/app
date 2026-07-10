@@ -14,7 +14,7 @@ describe("TokenRingApp Logs State", () => {
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
         printLogs: false,
-      },
+      }
     });
 
     // Add a log
@@ -34,7 +34,7 @@ describe("TokenRingApp Logs State", () => {
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
         printLogs: false,
-      },
+      }
     });
 
     // Add some logs
@@ -61,7 +61,7 @@ describe("TokenRingApp Logs State", () => {
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
         printLogs: false,
-      },
+      }
     });
 
     // Add logs to first app
@@ -76,7 +76,7 @@ describe("TokenRingApp Logs State", () => {
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
         printLogs: false,
-      },
+      }
     });
 
     app2.restoreState(checkpoint);

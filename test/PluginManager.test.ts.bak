@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach,beforeEach,describe,expect,it,mock,spyOn } from "bun:test";
 import PluginManager from "../PluginManager";
-import type TokenRingApp from "../TokenRingApp";
+import TokenRingApp from "../TokenRingApp";
 import createTestingApp from "./createTestingApp.test";
 
 describe("PluginManager", () => {
@@ -153,7 +153,8 @@ describe("PluginManager", () => {
 
       const plugin = new FailingPlugin();
 
-      expect(pluginManager.installPlugins([plugin])).rejects.toThrow("Install failed");
+      await expect(pluginManager.installPlugins([plugin]))
+        .rejects.toThrow("Install failed");
 
       // Plugin should NOT be registered since install failed
       expect(pluginManager.getPlugins()).not.toContain(plugin);
@@ -174,7 +175,8 @@ describe("PluginManager", () => {
       const plugin = new FailingStartPlugin();
 
       // Installation should succeed, but start should fail
-      expect(pluginManager.installPlugins([plugin])).rejects.toThrow("Start failed");
+      await expect(pluginManager.installPlugins([plugin]))
+        .rejects.toThrow("Start failed");
 
       // Plugin should be registered since install succeeded
       expect(pluginManager.getPlugins()).toContain(plugin);
@@ -196,10 +198,15 @@ describe("PluginManager", () => {
       // Spy on serviceError
       const serviceErrorSpy = spyOn(mockApp, "serviceError");
 
-      expect(pluginManager.installPlugins([plugin])).rejects.toThrow();
+      await expect(pluginManager.installPlugins([plugin]))
+        .rejects.toThrow();
 
       // Verify error was logged via serviceError
-      expect(serviceErrorSpy).toHaveBeenCalledWith(pluginManager, expect.stringContaining('Error installing plugin "FailingPlugin"'), expect.any(Error));
+      expect(serviceErrorSpy).toHaveBeenCalledWith(
+        pluginManager,
+        expect.stringContaining("Error installing plugin \"FailingPlugin\""),
+        expect.any(Error)
+      );
     });
 
     it("should log start errors via serviceError", async () => {
@@ -219,10 +226,15 @@ describe("PluginManager", () => {
       // Spy on serviceError
       const serviceErrorSpy = spyOn(mockApp, "serviceError");
 
-      expect(pluginManager.installPlugins([plugin])).rejects.toThrow();
+      await expect(pluginManager.installPlugins([plugin]))
+        .rejects.toThrow();
 
       // Verify error was logged via serviceError
-      expect(serviceErrorSpy).toHaveBeenCalledWith(pluginManager, expect.stringContaining('Error starting plugin "FailingStartPlugin"'), expect.any(Error));
+      expect(serviceErrorSpy).toHaveBeenCalledWith(
+        pluginManager,
+        expect.stringContaining("Error starting plugin \"FailingStartPlugin\""),
+        expect.any(Error)
+      );
     });
 
     it("should process install phase before start phase", async () => {

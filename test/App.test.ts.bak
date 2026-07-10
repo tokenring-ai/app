@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { setTimeout as delay } from "node:timers/promises";
+import { setTimeout as delay } from "timers/promises";
+import { afterEach,beforeEach,describe,expect,it,mock,spyOn } from "bun:test";
 import TokenRingApp from "../TokenRingApp";
 import type { TokenRingService } from "../types";
 import createTestingApp from "./createTestingApp.test";
@@ -34,6 +34,7 @@ describe("TokenRingApp", () => {
       expect(app.getService).toBeDefined();
       expect(app.getServices).toBeDefined();
     });
+
   });
 
   describe("Logging", () => {
@@ -49,7 +50,7 @@ describe("TokenRingApp", () => {
       expect(app.logs[0]).toEqual({
         timestamp: expect.any(Number),
         level: "info",
-        message: expect.stringContaining("Test message"),
+        message: expect.stringContaining("Test message")
       });
       expect(app.logs[0]?.message).toContain("[TestService]");
     });
@@ -66,7 +67,7 @@ describe("TokenRingApp", () => {
       expect(app.logs[0]).toEqual({
         timestamp: expect.any(Number),
         level: "error",
-        message: expect.stringContaining("Error message"),
+        message: expect.stringContaining("Error message")
       });
       expect(app.logs[0]?.message).toContain("[TestService]");
     });
@@ -107,7 +108,7 @@ describe("TokenRingApp", () => {
   describe("Configuration Management", () => {
     it("should get config slice with valid schema", () => {
       const mockSchema = {
-        parse: mock().mockReturnValue("parsed value"),
+        parse: mock().mockReturnValue("parsed value")
       };
 
       const config = {
@@ -118,7 +119,7 @@ describe("TokenRingApp", () => {
           serviceRestartDelayMs: 5000,
           printLogs: false,
         },
-        testKey: "test value",
+        testKey: "test value"
       };
       const appWithConfig = new TokenRingApp(config);
 
@@ -132,7 +133,7 @@ describe("TokenRingApp", () => {
       const mockSchema = {
         parse: mock().mockImplementation(() => {
           throw new Error("Invalid schema");
-        }),
+        })
       };
 
       const config = {
@@ -143,13 +144,13 @@ describe("TokenRingApp", () => {
           serviceRestartDelayMs: 5000,
           printLogs: false,
         },
-        testKey: "test value",
+        testKey: "test value"
       };
       const appWithConfig = new TokenRingApp(config);
 
       expect(() => {
         appWithConfig.getConfigSlice("testKey", mockSchema);
-      }).toThrow('Invalid config value for key "testKey": Invalid schema');
+      }).toThrow("Invalid config value for key \"testKey\": Invalid schema");
     });
   });
 
@@ -165,8 +166,8 @@ describe("TokenRingApp", () => {
       const mockWaitForItemByType = mock();
       Object.defineProperty(app, "services", {
         get: () => ({
-          waitForItemByType: mockWaitForItemByType,
-        }),
+          waitForItemByType: mockWaitForItemByType
+        })
       });
 
       app.waitForService(MockService, mockCallback);
@@ -191,7 +192,9 @@ describe("TokenRingApp", () => {
         name = "MockService2";
         description = "Mock service for testing";
 
-        async run() {}
+        async run() {
+        }
+
       }
 
       const mockService1 = new MockService1();
@@ -201,7 +204,10 @@ describe("TokenRingApp", () => {
 
       app.addServices(mockService1, mockService2);
 
-      await Promise.all([app.run(), delay(100).then(() => app.shutdown())]);
+      await Promise.all([
+        app.run(),
+        delay(100).then(() => app.shutdown())
+      ]);
 
       expect(mockService1.run).toHaveBeenCalled();
       expect(mockService2.run).toHaveBeenCalled();
@@ -215,7 +221,8 @@ describe("TokenRingApp", () => {
         description = "Mock service for testing";
 
         async run(signal: AbortSignal) {
-          await delay(10000, null, { signal }).catch(() => {});
+          await delay(10000, null, { signal }).catch(() => {
+          });
         }
 
         async stop() {
@@ -230,7 +237,7 @@ describe("TokenRingApp", () => {
       await delay(20);
       app.shutdown();
 
-      expect(runPromise).rejects.toThrow("Stop failed");
+      await expect(runPromise).rejects.toThrow("Stop failed");
       expect(lifecycleEvents).toEqual(["stop"]);
     });
 
@@ -252,20 +259,18 @@ describe("TokenRingApp", () => {
 
       app.addServices(new MockService());
 
-      expect(app.run()).rejects.toThrow("Start failed");
+      await expect(app.run()).rejects.toThrow("Start failed");
       expect(stop).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("Shutdown", () => {
     it("should abort the abort controller", () => {
-      // @ts-expect-error accessing private property for testing
-      expect(app.abortController.signal.aborted).toBe(false);
+      expect(app["abortController"].signal.aborted).toBe(false);
 
       app.shutdown();
 
-      // @ts-expect-error accessing private property for testing
-      expect(app.abortController.signal.aborted).toBe(true);
+      expect(app["abortController"].signal.aborted).toBe(true);
     });
   });
 });

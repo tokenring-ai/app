@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { setTimeout as delay } from "node:timers/promises";
+import { setTimeout as delay } from "timers/promises";
+import { afterEach,beforeEach,describe,expect,it,mock,spyOn } from "bun:test";
 import PluginManager from "../PluginManager";
 import StateManager from "../StateManager";
 import TokenRingApp from "../TokenRingApp";
@@ -139,11 +139,11 @@ describe("App Integration Tests", () => {
 
       const serialized = stateManager.serialize();
       expect(serialized).toEqual({
-        TestStateSlice: { data: "test data" },
+        TestStateSlice: { data: "test data" }
       });
 
       // App can access serialized state
-      stateManager.mutateState(TestStateSlice, state => {
+      stateManager.mutateState(TestStateSlice, (state) => {
         state.data = "modified data";
       });
 
@@ -182,7 +182,7 @@ describe("App Integration Tests", () => {
       callback.mockClear();
 
       // State mutation should trigger callback
-      stateManager.mutateState(TestStateSlice, state => {
+      stateManager.mutateState(TestStateSlice, (state) => {
         state.increment();
       });
 
@@ -262,13 +262,15 @@ describe("App Integration Tests", () => {
       class ServiceA implements TokenRingService {
         readonly name = "ServiceA";
         description = "Service A";
-        run = mock().mockImplementation(async () => {});
+        run = mock().mockImplementation(async () => {
+        });
       }
 
       class ServiceB implements TokenRingService {
         readonly name = "ServiceB";
         description = "Service B";
-        run = mock().mockImplementation(async () => {});
+        run = mock().mockImplementation(async () => {
+        });
       }
 
       const serviceA = new ServiceA();
@@ -298,7 +300,7 @@ describe("App Integration Tests", () => {
         serialize() {
           return {
             initialized: this.initialized,
-            data: this.data,
+            data: this.data
           };
         }
 
@@ -320,7 +322,7 @@ describe("App Integration Tests", () => {
       stateManager.initializeState(AppState, {});
 
       // Initialize state
-      stateManager.mutateState(AppState, state => {
+      stateManager.mutateState(AppState, (state) => {
         state.initialize();
         state.addData("item1");
       });
@@ -348,7 +350,7 @@ describe("App Integration Tests", () => {
           printLogs: false,
         },
         database: { url: "default://url" },
-        logging: { level: "info" },
+        logging: { level: "info" }
       };
 
       const appWithConfig = new TokenRingApp(config);
@@ -362,7 +364,7 @@ describe("App Integration Tests", () => {
           printLogs: false,
         },
         database: { url: "default://url" },
-        logging: { level: "info" },
+        logging: { level: "info" }
       });
 
       // Plugin manager should work with configured app
@@ -377,13 +379,11 @@ describe("App Integration Tests", () => {
           expect(app.config).toEqual({
             app: {
               dataDirectory: "/tmp",
-              configDirectories: [],
-              shutdownMonitorIntervalMs: 2000,
-              serviceRestartDelayMs: 5000,
-              printLogs: false,
+              configFileName: "config",
+              configSchema: {} as any,
             },
             database: { url: "default://url" },
-            logging: { level: "info" },
+            logging: { level: "info" }
           });
         };
       }
@@ -407,7 +407,10 @@ describe("App Integration Tests", () => {
 
       spyOn(errorService, "run");
       app.addServices(errorService);
-      await Promise.all([app.run(), delay(100).then(() => app.shutdown())]);
+      await Promise.all([
+        app.run(),
+        delay(100).then(() => app.shutdown())
+      ]);
 
       expect(errorService.run).toHaveBeenCalled();
     });
@@ -437,13 +440,15 @@ describe("App Integration Tests", () => {
       const workingPlugin = new WorkingPlugin();
 
       // Should throw on first plugin failure
-      expect(pluginManager.installPlugins([failingPlugin])).rejects.toThrow("Plugin installation failed");
+      await expect(pluginManager.installPlugins([failingPlugin]))
+        .rejects.toThrow("Plugin installation failed");
 
       // Plugin should not be registered
       expect(pluginManager.getPlugins()).not.toContain(failingPlugin);
 
       // Working plugin should still be installable
-      expect(pluginManager.installPlugins([workingPlugin])).resolves.toBeUndefined();
+      await expect(pluginManager.installPlugins([workingPlugin]))
+        .resolves.toBeUndefined();
 
       expect(pluginManager.getPlugins()).toContain(workingPlugin);
     });
@@ -509,7 +514,7 @@ describe("App Integration Tests", () => {
       app.addServices(new Service1(), new Service2());
 
       let callbackCalled = false;
-      app.waitForService(Service2, service => {
+      app.waitForService(Service2, (service) => {
         callbackCalled = true;
         expect(service.name).toBe("Service2");
       });
@@ -541,7 +546,7 @@ describe("App Integration Tests", () => {
 
       stateManager.initializeState(SharedState, {});
 
-      stateManager.mutateState(SharedState, state => {
+      stateManager.mutateState(SharedState, (state) => {
         state.setValue("initial");
       });
 
@@ -550,7 +555,7 @@ describe("App Integration Tests", () => {
       stateManager.subscribe(SharedState, component2Callback);
 
       // Component 3: Modifies state
-      stateManager.mutateState(SharedState, state => {
+      stateManager.mutateState(SharedState, (state) => {
         state.setValue("updated");
       });
 

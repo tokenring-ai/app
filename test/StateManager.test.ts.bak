@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach,beforeEach,describe,expect,it,mock } from "bun:test";
 import z from "zod";
-import StateManager, { type SerializableStateSlice } from "../StateManager.ts";
+import StateManager, { SerializableStateSlice } from "../StateManager.ts";
 
 const serializationSchema = z.object({
   data: z.string(),
@@ -84,7 +84,7 @@ describe("StateManager", () => {
 
     it("should throw error when mutating uninitialized state", () => {
       expect(() => {
-        stateManager.mutateState(MockStateSlice, state => state.data);
+        stateManager.mutateState(MockStateSlice, (state) => state.data);
       }).toThrow("State slice MockStateSlice not found");
     });
 
@@ -106,7 +106,7 @@ describe("StateManager", () => {
     });
 
     it("should mutate state and return result", () => {
-      const result = stateManager.mutateState(MockStateSlice, state => {
+      const result = stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("updated");
         return state.data;
       });
@@ -115,7 +115,7 @@ describe("StateManager", () => {
     });
 
     it("should update the actual state after mutation", () => {
-      stateManager.mutateState(MockStateSlice, state => {
+      stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("mutated");
       });
 
@@ -135,7 +135,7 @@ describe("StateManager", () => {
 
       expect(serialized).toEqual({
         MockStateSlice: { data: "serializable" },
-        AnotherStateSlice: { data: "also serializable" },
+        AnotherStateSlice: { data: "also serializable" }
       });
     });
 
@@ -156,7 +156,7 @@ describe("StateManager", () => {
     it("should deserialize existing state slices", () => {
       const data = {
         MockStateSlice: { data: "deserialized 1" },
-        AnotherStateSlice: { data: "deserialized 2" },
+        AnotherStateSlice: { data: "deserialized 2" }
       };
 
       stateManager.deserialize(data);
@@ -167,7 +167,7 @@ describe("StateManager", () => {
 
     it("should call onMissing callback for missing state slices in data", () => {
       const data = {
-        MockStateSlice: { data: "known" },
+        MockStateSlice: { data: "known" }
         // AnotherStateSlice is missing
       };
 
@@ -181,7 +181,7 @@ describe("StateManager", () => {
     it("should not call onMissing when all slices are present in data", () => {
       const data = {
         MockStateSlice: { data: "known" },
-        AnotherStateSlice: { data: "also known" },
+        AnotherStateSlice: { data: "also known" }
       };
 
       const onMissing = mock();
@@ -201,7 +201,7 @@ describe("StateManager", () => {
     it("should iterate over all state slices", () => {
       const iterated: string[] = [];
 
-      stateManager.forEach(slice => {
+      stateManager.forEach((slice) => {
         iterated.push(slice.name);
       });
 
@@ -243,7 +243,7 @@ describe("StateManager", () => {
 
       callback.mockClear();
 
-      stateManager.mutateState(MockStateSlice, state => {
+      stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("changed");
       });
 
@@ -260,7 +260,7 @@ describe("StateManager", () => {
       callback.mockClear();
       unsubscribe();
 
-      stateManager.mutateState(MockStateSlice, state => {
+      stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("changed");
       });
 
@@ -277,7 +277,7 @@ describe("StateManager", () => {
       callback1.mockClear();
       callback2.mockClear();
 
-      stateManager.mutateState(MockStateSlice, state => {
+      stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("changed");
       });
 
@@ -295,7 +295,7 @@ describe("StateManager", () => {
     });
 
     it("should resolve immediately if predicate already true", async () => {
-      const result = await stateManager.waitForState(MockStateSlice, state => {
+      const result = await stateManager.waitForState(MockStateSlice, (state) => {
         return state.data === "initial";
       });
 
@@ -303,13 +303,13 @@ describe("StateManager", () => {
     });
 
     it("should wait for state change", async () => {
-      const waitPromise = stateManager.waitForState(MockStateSlice, state => {
+      const waitPromise = stateManager.waitForState(MockStateSlice, (state) => {
         return state.data === "changed";
       });
 
       // Change state after a short delay
       setTimeout(() => {
-        stateManager.mutateState(MockStateSlice, state => {
+        stateManager.mutateState(MockStateSlice, (state) => {
           state.updateData("changed");
         });
       }, 10);
@@ -319,20 +319,32 @@ describe("StateManager", () => {
     });
 
     it("should handle timeout in timedWaitForState", async () => {
-      expect(stateManager.timedWaitForState(MockStateSlice, state => state.data === "never", 50)).rejects.toThrow("Timeout waiting for state MockStateSlice");
+      await expect(stateManager.timedWaitForState(
+        MockStateSlice,
+        (state) => state.data === "never",
+        50
+      )).rejects.toThrow("Timeout waiting for state MockStateSlice");
     });
 
     it("should resolve with timeout if condition met", async () => {
-      const result = await stateManager.timedWaitForState(MockStateSlice, state => state.data === "initial", 100);
+      const result = await stateManager.timedWaitForState(
+        MockStateSlice,
+        (state) => state.data === "initial",
+        100
+      );
 
       expect(result.data).toBe("initial");
     });
 
     it("should handle timeout with state change", async () => {
-      const waitPromise = stateManager.timedWaitForState(MockStateSlice, state => state.data === "changed", 50);
+      const waitPromise = stateManager.timedWaitForState(
+        MockStateSlice,
+        (state) => state.data === "changed",
+        50
+      );
 
       setTimeout(() => {
-        stateManager.mutateState(MockStateSlice, state => {
+        stateManager.mutateState(MockStateSlice, (state) => {
           state.updateData("changed");
         });
       }, 10);
@@ -370,13 +382,13 @@ describe("StateManager", () => {
 
       // Trigger state changes
       setTimeout(() => {
-        stateManager.mutateState(MockStateSlice, state => {
+        stateManager.mutateState(MockStateSlice, (state) => {
           state.updateData("first change");
         });
       }, 15);
 
       setTimeout(() => {
-        stateManager.mutateState(MockStateSlice, state => {
+        stateManager.mutateState(MockStateSlice, (state) => {
           state.updateData("second change");
         });
       }, 30);
@@ -399,7 +411,7 @@ describe("StateManager", () => {
       // Start async iteration
       const iteratePromise = (async () => {
         // noinspection LoopStatementThatDoesntLoopJS
-        for await (const _state of generator) {
+        for await (const state of generator) {
           break; // Exit immediately
         }
       })();
@@ -413,13 +425,13 @@ describe("StateManager", () => {
       const generator = stateManager.subscribeAsync(MockStateSlice, controller.signal);
 
       // Trigger multiple rapid changes
-      stateManager.mutateState(MockStateSlice, state => {
+      stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("change 1");
       });
-      stateManager.mutateState(MockStateSlice, state => {
+      stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("change 2");
       });
-      stateManager.mutateState(MockStateSlice, state => {
+      stateManager.mutateState(MockStateSlice, (state) => {
         state.updateData("change 3");
       });
 

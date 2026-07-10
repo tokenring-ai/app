@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import appRpc from "../rpc/app.ts";
-import type TokenRingApp from "../TokenRingApp";
 import type { LogEntry } from "../TokenRingApp";
+import TokenRingApp from "../TokenRingApp";
+import appRpc from "../rpc/app.ts";
 import createTestingApp from "./createTestingApp.test";
 
 type StreamResult = { logs: LogEntry[]; position: number };
