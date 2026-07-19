@@ -194,6 +194,19 @@ export default class TokenRingApp {
   }
 
   /**
+   * Swaps the app configuration in place, keeping the same object identity so
+   * services holding a reference to `this.config` observe the update. Called
+   * by ConfigurationService after plugins have been reconfigured.
+   */
+  replaceConfig(newConfig: TokenRingAppConfig): void {
+    for (const key of Object.keys(this.config)) {
+      if (!(key in newConfig)) delete this.config[key];
+    }
+    Object.assign(this.config, newConfig);
+    this.log("info", "[TokenRingApp] Configuration updated");
+  }
+
+  /**
    * Get a config value by key and parse it using the provided schema
    */
   getConfigSlice<T extends { parse: (any: any) => any }>(key: string, schema: T): z.output<T> {

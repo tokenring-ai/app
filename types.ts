@@ -64,55 +64,6 @@ export class NotImplementedError extends Error {
 
 export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {}
 
-export type AppConfigItem =
-  | {
-      type: "text";
-      description: string;
-      minLength?: number;
-      maxLength?: number;
-      required?: boolean;
-    }
-  | {
-      type: "multilineText";
-      description: string;
-      minLength?: number;
-      maxLength?: number;
-      required?: boolean;
-    }
-  | {
-      type: "number" | "slider";
-      description: string;
-      min?: number;
-      max?: number;
-      required?: boolean;
-      decimals?: number;
-    }
-  | {
-      type: "checkbox";
-      description: string;
-      required?: boolean;
-    }
-  | {
-      type: "date";
-      description: string;
-      required?: boolean;
-    }
-  | {
-      type: "select";
-      description: string;
-      options: {
-        label: string;
-        value: string;
-      }[];
-    }
-  | {
-      type: "categorySelect";
-      description: string;
-      categories: Record<
-        string,
-        {
-          label: string;
-          value: string;
-        }[]
-      >;
-    };
+// The configuration UI field spec lives in config/uiSchema.ts; this alias is
+// kept for compatibility with earlier code that imported it from types.ts.
+export type { ConfigFieldSpec as AppConfigItem } from "./config/uiSchema.ts";
