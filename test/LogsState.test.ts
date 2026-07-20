@@ -85,4 +85,32 @@ describe("TokenRingApp Logs State", () => {
     expect(app2.logs).toHaveLength(1);
     expect(app2.logs[0]?.message).toContain("Restored message");
   });
+
+  it("should not skip logs appended while a subscriber processes an entry", async () => {
+    const app = new TokenRingApp({
+      app: {
+        dataDirectory: "/tmp",
+        configDirectories: [],
+        shutdownMonitorIntervalMs: 2000,
+        serviceRestartDelayMs: 5000,
+        printLogs: false,
+      },
+    });
+    const controller = new AbortController();
+    const logs = app.subscribeLogsAsync(0, controller.signal);
+
+    app.serviceOutput(testService, "First message");
+    const first = await logs.next();
+    expect(first.value?.message).toContain("First message");
+
+    // Append while the generator is suspended at the first yield. Since the
+    // state object is mutable, advancing the cursor after this point used to
+    // mark the second message as consumed without ever yielding it.
+    app.serviceOutput(testService, "Second message");
+    const second = await logs.next();
+    expect(second.value?.message).toContain("Second message");
+
+    controller.abort();
+    await logs.next();
+  });
 });

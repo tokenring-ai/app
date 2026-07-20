@@ -186,10 +186,12 @@ export default class TokenRingApp {
       if (state.logs.length <= position) {
         continue;
       }
+
+      const endPosition = state.logs.length;
       for (const log of state.logs.slice(position)) {
         yield log;
       }
-      position = state.logs.length;
+      position = endPosition;
     }
   }
 
