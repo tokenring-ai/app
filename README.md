@@ -59,7 +59,6 @@ This package depends on:
 
 **Dev Dependencies:**
 
-- `vitest` (^4.1.1) - Testing framework
 - `typescript` (^6.0.2) - Type checking
 
 ## Core Components
@@ -1549,7 +1548,7 @@ bun run build
 ### Contribution Guidelines
 
 - Follow established coding patterns
-- Write unit tests for new functionality using vitest
+- Write unit tests for new functionality using `bun test`
 - Ensure Zod schema validation for all configuration
 - Update documentation for new features
 - Test with multiple service configurations
