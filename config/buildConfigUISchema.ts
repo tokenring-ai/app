@@ -381,11 +381,11 @@ function buildVariantNode(def: ZodDef, base: NodeBase): ConfigUINode | null {
  * config.
  */
 export default function buildConfigUISchema(plugin: TokenRingPlugin<any>): ConfigUIPluginSchema | null {
-  if (!("config" in plugin)) return null;
+  if (!("configSchema" in plugin)) return null;
 
   // oxlint-disable typescript/no-unsafe-assignment
-  const config = plugin.config;
-  const shape = (config.shape ?? defOf(config).shape) as Record<string, unknown> | undefined;
+  const configSchema = plugin.configSchema;
+  const shape = (configSchema.shape ?? defOf(configSchema).shape) as Record<string, unknown> | undefined;
   if (!shape) return null;
 
   const slices: Record<string, ConfigUINode> = {};

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { setTimeout as delay } from "node:timers/promises";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import TokenRingApp from "../TokenRingApp";
 import type { TokenRingService } from "../types";
 import createTestingApp from "./createTestingApp.test";
@@ -101,55 +102,6 @@ describe("TokenRingApp", () => {
       expect(app.logs).toHaveLength(1);
       expect(app.logs[0]?.level).toBe("error");
       expect(app.logs[0]?.message).toContain("Test error");
-    });
-  });
-
-  describe("Configuration Management", () => {
-    it("should get config slice with valid schema", () => {
-      const mockSchema = {
-        parse: mock().mockReturnValue("parsed value"),
-      };
-
-      const config = {
-        app: {
-          dataDirectory: "/tmp",
-          configDirectories: [],
-          shutdownMonitorIntervalMs: 2000,
-          serviceRestartDelayMs: 5000,
-          printLogs: false,
-        },
-        testKey: "test value",
-      };
-      const appWithConfig = new TokenRingApp(config);
-
-      const result = appWithConfig.getConfigSlice("testKey", mockSchema);
-
-      expect(result).toBe("parsed value");
-      expect(mockSchema.parse).toHaveBeenCalledWith("test value");
-    });
-
-    it("should throw error for invalid config slice", () => {
-      const mockSchema = {
-        parse: mock().mockImplementation(() => {
-          throw new Error("Invalid schema");
-        }),
-      };
-
-      const config = {
-        app: {
-          dataDirectory: "/tmp",
-          configDirectories: [],
-          shutdownMonitorIntervalMs: 2000,
-          serviceRestartDelayMs: 5000,
-          printLogs: false,
-        },
-        testKey: "test value",
-      };
-      const appWithConfig = new TokenRingApp(config);
-
-      expect(() => {
-        appWithConfig.getConfigSlice("testKey", mockSchema);
-      }).toThrow('Invalid config value for key "testKey": Invalid schema');
     });
   });
 

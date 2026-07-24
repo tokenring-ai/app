@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { setTimeout as delay } from "node:timers/promises";
 import PluginManager from "../PluginManager";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import StateManager from "../StateManager";
 import TokenRingApp from "../TokenRingApp";
 import type { TokenRingPlugin, TokenRingService } from "../types";
@@ -262,13 +263,15 @@ describe("App Integration Tests", () => {
       class ServiceA implements TokenRingService {
         readonly name = "ServiceA";
         description = "Service A";
-        run = mock().mockImplementation(async () => {});
+        run = mock().mockImplementation(async () => {
+        });
       }
 
       class ServiceB implements TokenRingService {
         readonly name = "ServiceB";
         description = "Service B";
-        run = mock().mockImplementation(async () => {});
+        run = mock().mockImplementation(async () => {
+        });
       }
 
       const serviceA = new ServiceA();
@@ -352,8 +355,16 @@ describe("App Integration Tests", () => {
       };
 
       const appWithConfig = new TokenRingApp(config);
+      expect(appWithConfig.appConfig).toEqual({
+        dataDirectory: "/tmp",
+        configDirectories: [],
+        shutdownMonitorIntervalMs: 2000,
+        serviceRestartDelayMs: 5000,
+        printLogs: false,
+      });
 
-      expect(appWithConfig.config).toEqual({
+      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      expect(fullConfig).toEqual({
         app: {
           dataDirectory: "/tmp",
           configDirectories: [],
@@ -374,16 +385,12 @@ describe("App Integration Tests", () => {
         version = "1.0.0";
         description = "Config test plugin";
         install = (app: TokenRingApp) => {
-          expect(app.config).toEqual({
-            app: {
-              dataDirectory: "/tmp",
-              configDirectories: [],
-              shutdownMonitorIntervalMs: 2000,
-              serviceRestartDelayMs: 5000,
-              printLogs: false,
-            },
-            database: { url: "default://url" },
-            logging: { level: "info" },
+          expect(app.appConfig).toEqual({
+            dataDirectory: "/tmp",
+            configDirectories: [],
+            shutdownMonitorIntervalMs: 2000,
+            serviceRestartDelayMs: 5000,
+            printLogs: false,
           });
         };
       }

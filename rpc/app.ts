@@ -13,7 +13,7 @@ export default createRPCEndpoint(AppRpcSchema, {
         displayName: p.displayName,
         version: p.version,
         description: p.description,
-        hasConfig: "config" in p,
+        hasConfig: "configSchema" in p,
       })),
     };
   },

@@ -20,12 +20,15 @@ export type TokenRingPlugin<ConfigType = void> = ConfigType extends void
       readonly displayName: string;
       readonly version: string;
       readonly description: string;
-      readonly config: ConfigType;
+      readonly config?: Record<string, unknown>;
+      readonly configSchema: ConfigType;
       earlyInstall?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
       install?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void | undefined>;
       start?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
       reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
     };
+
+export type TokenRingPluginOrBuilder = TokenRingPlugin<any> | ((app: TokenRingApp) => MaybePromise<TokenRingPlugin<any>>);
 
 export interface TokenRingService {
   readonly name: string;

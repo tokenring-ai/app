@@ -8,7 +8,6 @@ export default createRPCEndpoint(ConfigRpcSchema, {
     const configurationService = app.requireService(ConfigurationService);
     return {
       plugins: configurationService.getUISchemas(),
-      restartRequired: configurationService.restartRequired,
       overridesFile: configurationService.overridesFile,
       overlayError: configurationService.overlayError ?? null,
     };

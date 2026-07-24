@@ -56,7 +56,7 @@ describe("Config RPC", () => {
       displayName: "Widget Plugin",
       version: "1.0.0",
       description: "Widget plugin",
-      config: pluginConfig,
+      configSchema: pluginConfig,
       reconfigure() {},
     } satisfies TokenRingPlugin<typeof pluginConfig>;
     await pluginManager.installPlugins([plugin]);
@@ -74,12 +74,11 @@ describe("Config RPC", () => {
     expect(result.plugins.map(plugin => plugin.pluginName)).toEqual(["widget-plugin"]);
     expect(result.overridesFile).toBe(overridesFile);
     expect(result.overlayError).toBeNull();
-    expect(result.restartRequired).toBe(false);
   });
 
   it("applyConfig persists and getConfigValues round-trips the override", async () => {
     const applied = await client.applyConfig({ overrides: { widget: { size: 7 } } });
-    expect(applied).toEqual({ ok: true, restartRequired: false });
+    expect(applied).toEqual({ ok: true });
 
     const values = await client.getConfigValues({});
     expect((values.effective.widget as any).size).toBe(7);
@@ -113,7 +112,7 @@ describe("Config RPC", () => {
   it("resetConfig removes overrides", async () => {
     await client.applyConfig({ overrides: { widget: { size: 7 } } });
     const result = await client.resetConfig({ path: ["widget", "size"] });
-    expect(result).toEqual({ ok: true, restartRequired: false });
+    expect(result).toEqual({ ok: true });
     const values = await client.getConfigValues({});
     expect(values.overrides).toEqual({});
     expect((values.effective.widget as any).size).toBe(5);

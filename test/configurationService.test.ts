@@ -7,6 +7,7 @@ import { z } from "zod";
 import ConfigurationService from "../config/ConfigurationService.ts";
 import PluginManager from "../PluginManager.ts";
 import { TokenRingAppConfigSchema } from "../schema.ts";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import TokenRingApp from "../TokenRingApp.ts";
 import type { TokenRingPlugin } from "../types.ts";
 
@@ -80,7 +81,7 @@ describe("ConfigurationService", () => {
       displayName: "Test Plugin",
       version: "1.0.0",
       description: "A reconfigurable test plugin",
-      config: testPluginConfig,
+      configSchema: testPluginConfig,
       reconfigure: reconfigureSpy,
     } satisfies TokenRingPlugin<typeof testPluginConfig>;
     const rigidPlugin = {
@@ -88,7 +89,7 @@ describe("ConfigurationService", () => {
       displayName: "Other Plugin",
       version: "1.0.0",
       description: "A plugin without reconfigure support",
-      config: otherPluginConfig,
+      configSchema: otherPluginConfig,
     } satisfies TokenRingPlugin<typeof otherPluginConfig>;
 
     await pluginManager.installPlugins([reconfigurablePlugin, rigidPlugin]);
@@ -117,20 +118,22 @@ describe("ConfigurationService", () => {
   describe("apply", () => {
     it("persists a sparse override file, updates live config, and reconfigures", async () => {
       const result = await service.apply({ testPlugin: { size: 7 } });
-      expect(result).toEqual({ ok: true, restartRequired: false });
+      expect(result).toEqual({ ok: true });
 
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 7 } });
       expect(fs.readFileSync(overridesFile, "utf8")).toStartWith("# TokenRing user configuration overrides.");
       expect(fs.existsSync(`${overridesFile}.tmp`)).toBe(false);
 
-      expect((app.config as any).testPlugin.size).toBe(7);
+      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+
+      expect((fullConfig as any).testPlugin.size).toBe(7);
       expect(reconfigureSpy).toHaveBeenCalledTimes(1);
       expect((reconfigureSpy.mock.calls[0] as any)[1].testPlugin.size).toBe(7);
     });
 
     it("prunes values equal to the effective base config", async () => {
       const result = await service.apply({ testPlugin: { size: 5, name: "base-name", nested: { flag: false } } });
-      expect(result).toEqual({ ok: true, restartRequired: false });
+      expect(result).toEqual({ ok: true,  });
       expect(readOverridesFile()).toBeNull();
       expect(service.getOverrides()).toEqual({});
     });
@@ -139,7 +142,9 @@ describe("ConfigurationService", () => {
       // base sets size 5; the schema default is 10 — an override of 10 is a real deviation
       await service.apply({ testPlugin: { size: 10 } });
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 10 } });
-      expect((app.config as any).testPlugin.size).toBe(10);
+
+      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      expect((fullConfig as any).testPlugin.size).toBe(10);
     });
 
     it("keeps an empty object override that enables an absent slice", async () => {
@@ -154,7 +159,9 @@ describe("ConfigurationService", () => {
       expect(result.issues[0]!.path).toEqual(["testPlugin", "size"]);
 
       expect(fs.existsSync(overridesFile)).toBe(false);
-      expect((app.config as any).testPlugin.size).toBe(5);
+
+      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      expect((fullConfig as any).testPlugin.size).toBe(5);
       expect(reconfigureSpy).not.toHaveBeenCalled();
     });
 
@@ -163,15 +170,6 @@ describe("ConfigurationService", () => {
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error("unreachable");
       expect(result.issues[0]!.message).toContain("nonsense");
-    });
-
-    it("flags restartRequired when a changed plugin lacks reconfigure, and keeps it sticky", async () => {
-      const first = await service.apply({ other: { value: "x" } });
-      expect(first).toEqual({ ok: true, restartRequired: true });
-      expect(service.restartRequired).toBe(true);
-
-      const second = await service.apply({ other: { value: "x" }, testPlugin: { size: 6 } });
-      expect(second).toEqual({ ok: true, restartRequired: true });
     });
 
     it("serializes concurrent applies", async () => {
@@ -232,7 +230,9 @@ describe("ConfigurationService", () => {
       await service.apply({ testPlugin: { size: 7, name: "custom" } });
       await service.resetPath(["testPlugin", "size"]);
       expect(readOverridesFile()).toEqual({ testPlugin: { name: "custom" } });
-      expect((app.config as any).testPlugin.size).toBe(5);
+
+      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      expect((fullConfig as any).testPlugin.size).toBe(5);
 
       await service.resetPath(["testPlugin", "name"]);
       expect(readOverridesFile()).toBeNull();

@@ -4,6 +4,7 @@ import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import { generateHumanId } from "@tokenring-ai/utility/string/generateHumanId";
 import type { z } from "zod";
+import { AppConfigurationState } from "./state/AppConfigurationState.ts";
 import StateManager from "./StateManager.ts";
 import type { AppSessionCheckpoint, TokenRingAppConfig } from "./schema.ts";
 import { AppLogsState } from "./state/AppLogsState.ts";
@@ -27,21 +28,12 @@ export default class TokenRingApp {
   getServices = this.services.getItems;
   private readonly abortController = new AbortController();
   private shutdownStartedAt?: number | undefined;
+  public readonly appConfig: TokenRingAppConfig["app"];
 
-  constructor(readonly config: TokenRingAppConfig) {
-    // Initialize the logs state slice
+  constructor(config: TokenRingAppConfig) {
+    this.appConfig = config.app;
     this.stateManager.initializeState(AppLogsState, {});
-    if (config.app.printLogs) {
-      this.runNamedBackgroundTask("TokenRingApp[LogWatcher]", async () => {
-        for await (const entry of this.subscribeLogsAsync(0, this.abortController.signal)) {
-          if (entry.level === "error") {
-            console.error(entry.message);
-          } else {
-            console.log(entry.message);
-          }
-        }
-      });
-    }
+    this.stateManager.initializeState(AppConfigurationState, config);
   }
 
   /**
@@ -102,18 +94,18 @@ export default class TokenRingApp {
                 // If run() completes without error but we aren't aborted, it exited "normally"
                 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
                 if (!signal.aborted) {
-                  this.serviceError(service, `Exited unexpectedly. Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
+                  this.serviceError(service, `Exited unexpectedly. Restarting in ${this.appConfig.serviceRestartDelayMs / 1000}s...`);
                 }
               } catch (err) {
                 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
                 if (!signal.aborted) {
-                  this.serviceError(service, `Died with error:`, err, `Restarting in ${this.config.app.serviceRestartDelayMs / 1000}s...`);
+                  this.serviceError(service, `Died with error:`, err, `Restarting in ${this.appConfig.serviceRestartDelayMs / 1000}s...`);
                 }
               }
 
               // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- can be mutated asynchronously
               if (signal.aborted) break;
-              await delay(this.config.app.serviceRestartDelayMs, null, {
+              await delay(this.appConfig.serviceRestartDelayMs, null, {
                 signal,
               }).catch(() => null);
             }
@@ -195,29 +187,6 @@ export default class TokenRingApp {
     }
   }
 
-  /**
-   * Swaps the app configuration in place, keeping the same object identity so
-   * services holding a reference to `this.config` observe the update. Called
-   * by ConfigurationService after plugins have been reconfigured.
-   */
-  replaceConfig(newConfig: TokenRingAppConfig): void {
-    for (const key of Object.keys(this.config)) {
-      if (!(key in newConfig)) delete this.config[key];
-    }
-    Object.assign(this.config, newConfig);
-    this.log("info", "[TokenRingApp] Configuration updated");
-  }
-
-  /**
-   * Get a config value by key and parse it using the provided schema
-   */
-  getConfigSlice<T extends { parse: (any: any) => any }>(key: string, schema: T): z.output<T> {
-    try {
-      return schema.parse(this.config[key]) as z.output<T>;
-    } catch (error: unknown) {
-      throw new Error(`Invalid config value for key "${key}": ${(error as Error).message}`);
-    }
-  }
 
   /**
    * Returns a formatted status string describing what is still
@@ -255,7 +224,7 @@ export default class TokenRingApp {
       if (status) {
         process.stdout.write(status);
       }
-    }, this.config.app.shutdownMonitorIntervalMs);
+    }, this.appConfig.shutdownMonitorIntervalMs);
     timer.unref();
 
     return () => clearInterval(timer);
@@ -283,6 +252,12 @@ export default class TokenRingApp {
   }
 
   private log(level: "info" | "error", message: string) {
+    if (level === "error") {
+      console.error(message);
+    } else {
+      console.log(message);
+    }
+
     this.stateManager.mutateState(AppLogsState, state => {
       state.addLog(level, message);
     });

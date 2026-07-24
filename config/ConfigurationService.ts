@@ -2,6 +2,7 @@ import deepClone from "@tokenring-ai/utility/object/deepClone";
 import type { z } from "zod";
 import PluginManager from "../PluginManager.ts";
 import type { TokenRingAppConfig } from "../schema.ts";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import type TokenRingApp from "../TokenRingApp.ts";
 import type { TokenRingService } from "../types.ts";
 import buildConfigUISchema from "./buildConfigUISchema.ts";
@@ -14,7 +15,7 @@ export interface ConfigValidationIssue {
   message: string;
 }
 
-export type ConfigApplyResult = { ok: true; restartRequired: boolean } | { ok: false; issues: ConfigValidationIssue[] };
+export type ConfigApplyResult = { ok: true } | { ok: false; issues: ConfigValidationIssue[] };
 
 export interface ConfigurationServiceOptions {
   /** The composed app config schema (all plugin shapes merged). */
@@ -42,7 +43,7 @@ export default class ConfigurationService implements TokenRingService {
   readonly description = "Manages user configuration overrides and live plugin reconfiguration";
 
   /** Sticky: set once any applied change could not be live-reconfigured. */
-  restartRequired = false;
+  //restartRequired = false;
   readonly overlayError: string | undefined;
   readonly overridesFile: string;
 
@@ -70,7 +71,7 @@ export default class ConfigurationService implements TokenRingService {
       const pluginManager = this.app.requireService(PluginManager);
       this.uiSchemaCache = pluginManager
         .getPlugins()
-        .filter(plugin => "config" in plugin)
+        .filter(plugin => "configSchema" in plugin)
         .map(plugin => buildConfigUISchema(plugin))
         .filter((uiSchema): uiSchema is ConfigUIPluginSchema => uiSchema !== null && Object.keys(uiSchema.slices).length > 0);
     }
@@ -154,19 +155,17 @@ export default class ConfigurationService implements TokenRingService {
     return this.apply(next);
   }
 
-  private async doApply(candidateOverrides: Record<string, unknown>): Promise<ConfigApplyResult> {
+  private doApply(candidateOverrides: Record<string, unknown>): ConfigApplyResult {
     const validation = this.validateOverrides(candidateOverrides);
     if (!validation.ok) return validation;
     const { normalized, parsed } = validation;
 
-    const pluginManager = this.app.requireService(PluginManager);
-    const { restartRequired } = await pluginManager.reconfigurePlugins(parsed as TokenRingAppConfig);
-    this.app.replaceConfig(parsed as TokenRingAppConfig);
+    AppConfigurationState.replaceConfig(parsed as TokenRingAppConfig, this.app);
+
     writeYamlAtomic(this.overridesFile, normalized, OVERRIDES_HEADER);
     this.overrides = normalized;
 
-    if (restartRequired) this.restartRequired = true;
-    return { ok: true, restartRequired: this.restartRequired };
+    return { ok: true };
   }
 
   private get parsedBase(): unknown {

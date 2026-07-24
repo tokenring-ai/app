@@ -7,7 +7,7 @@ export const ConfigIssueSchema = z.object({
 });
 
 const ApplyResultSchema = z.discriminatedUnion("ok", [
-  z.object({ ok: z.literal(true), restartRequired: z.boolean() }),
+  z.object({ ok: z.literal(true) }),
   z.object({ ok: z.literal(false), issues: z.array(ConfigIssueSchema) }),
 ]);
 
@@ -28,7 +28,6 @@ const ConfigRpcSchema = {
       input: z.object({}),
       result: z.object({
         plugins: z.array(ConfigUIPluginSchemaSchema),
-        restartRequired: z.boolean(),
         overridesFile: z.string(),
         overlayError: z.string().nullable(),
       }),

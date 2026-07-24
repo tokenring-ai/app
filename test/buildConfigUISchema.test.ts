@@ -221,7 +221,7 @@ describe("buildConfigUISchema", () => {
     displayName: "Filesystem",
     version: "1.0.0",
     description: "Filesystem plugin",
-    config: configSchema,
+    configSchema: configSchema,
   } satisfies TokenRingPlugin<typeof configSchema>;
 
   it("produces one slice per top-level config key", () => {
