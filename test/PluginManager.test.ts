@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { z } from "zod";
 import PluginManager from "../PluginManager";
-import type TokenRingApp from "../TokenRingApp";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
+import TokenRingApp from "../TokenRingApp";
+import type { TokenRingPlugin } from "../types.ts";
 import createTestingApp from "./createTestingApp.test";
 
 describe("PluginManager", () => {
@@ -291,6 +294,96 @@ describe("PluginManager", () => {
 
       expect(plugins).toHaveLength(1);
       expect(plugins[0]).toBe(plugin);
+    });
+  });
+
+  describe("Plugin Configuration", () => {
+    const widgetSchema = z.object({
+      widget: z.object({ size: z.number().default(1), color: z.string().default("red") }).prefault({}),
+    });
+
+    const makePlugin = (overrides: Partial<TokenRingPlugin<typeof widgetSchema>> = {}) =>
+      ({
+        name: "widget-plugin",
+        displayName: "Widget Plugin",
+        version: "1.0.0",
+        description: "Widget plugin",
+        configSchema: widgetSchema,
+        config: { widget: { size: 4 } },
+        install: mock(),
+        ...overrides,
+      }) as TokenRingPlugin<typeof widgetSchema> & { install: ReturnType<typeof mock> };
+
+    beforeEach(() => {
+      mockApp = createTestingApp();
+      pluginManager = new PluginManager(mockApp);
+    });
+
+    it("registers the plugin default config as its own layer", async () => {
+      const plugin = makePlugin();
+      await pluginManager.installPlugins([plugin]);
+
+      const state = mockApp.stateManager.getState(AppConfigurationState);
+      expect(state.pluginConfigs).toEqual({ "widget-plugin": { widget: { size: 4 } } });
+      expect((state.mergedConfig as any).widget).toEqual({ size: 4 });
+      expect(plugin.install).toHaveBeenCalledWith(mockApp, { widget: { size: 4, color: "red" } });
+    });
+
+    it("lets the user layer override a plugin default", async () => {
+      const appConfig = createTestingApp().stateManager.getState(AppConfigurationState).appConfig;
+      mockApp = new TokenRingApp(appConfig, { userConfig: { widget: { size: 9 } } });
+      pluginManager = new PluginManager(mockApp);
+
+      const plugin = makePlugin();
+      await pluginManager.installPlugins([plugin]);
+
+      expect(plugin.install).toHaveBeenCalledWith(mockApp, { widget: { size: 9, color: "red" } });
+    });
+
+    it("reconfigures only the plugins whose config slice changed", async () => {
+      const reconfigure = mock();
+      const plugin = makePlugin({ reconfigure });
+      await pluginManager.installPlugins([plugin]);
+
+      // Nothing changed since install — no reconfiguration.
+      await pluginManager.reconfigurePlugins();
+      expect(reconfigure).not.toHaveBeenCalled();
+
+      AppConfigurationState.setUserConfig(mockApp, { widget: { color: "blue" } });
+      await pluginManager.reconfigurePlugins();
+      expect(reconfigure).toHaveBeenCalledWith(mockApp, { widget: { size: 4, color: "blue" } });
+
+      // Re-running without a further change is a no-op.
+      await pluginManager.reconfigurePlugins();
+      expect(reconfigure).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not reconfigure a plugin that mutated the config it was handed", async () => {
+      const reconfigure = mock();
+      const plugin = makePlugin({
+        // Plugins fill in defaults from the environment this way.
+        install: mock().mockImplementation((_app, config: any) => {
+          config.widget.color = "fromEnv";
+        }),
+        reconfigure,
+      });
+
+      await pluginManager.installPlugins([plugin]);
+      await pluginManager.reconfigurePlugins();
+
+      expect(reconfigure).not.toHaveBeenCalled();
+      expect(mockApp.stateManager.getState(AppConfigurationState).requiresRestartToFullyApplyConfig).toBe(false);
+    });
+
+    it("flags a restart when a changed plugin cannot be reconfigured live", async () => {
+      await pluginManager.installPlugins([makePlugin()]);
+      const state = mockApp.stateManager.getState(AppConfigurationState);
+      expect(state.requiresRestartToFullyApplyConfig).toBe(false);
+
+      AppConfigurationState.setUserConfig(mockApp, { widget: { color: "blue" } });
+      await pluginManager.reconfigurePlugins();
+
+      expect(state.requiresRestartToFullyApplyConfig).toBe(true);
     });
   });
 });

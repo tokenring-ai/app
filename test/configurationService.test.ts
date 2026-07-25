@@ -43,6 +43,7 @@ const composedSchema = z.object({
 describe("ConfigurationService", () => {
   let tempDir: string;
   let overridesFile: string;
+  let projectOverridesFile: string;
   let app: TokenRingApp;
   let pluginManager: PluginManager;
   let service: ConfigurationService;
@@ -60,16 +61,13 @@ describe("ConfigurationService", () => {
     },
   });
 
-  async function setup(overrides: Record<string, unknown> = {}, overlayError?: string) {
-    const base = baseConfig();
-    const parsed = composedSchema.parse(base);
+  async function setup(userConfig: Record<string, unknown> = {}, overlayError?: string) {
+    const parsed = composedSchema.parse(baseConfig());
 
-    app = new TokenRingApp(parsed);
+    app = new TokenRingApp(parsed, { userConfig });
     service = new ConfigurationService(app, {
       configSchema: composedSchema,
-      baseConfig: base,
-      overridesFile,
-      overrides,
+      overridesFiles: { user: overridesFile, project: projectOverridesFile },
       overlayError,
     });
     app.addServices(service);
@@ -98,6 +96,7 @@ describe("ConfigurationService", () => {
   beforeEach(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "trconfig-"));
     overridesFile = path.join(tempDir, "nested", "config.yaml");
+    projectOverridesFile = path.join(tempDir, "project", "config.yaml");
     await setup();
   });
 
@@ -117,63 +116,84 @@ describe("ConfigurationService", () => {
 
   describe("apply", () => {
     it("persists a sparse override file, updates live config, and reconfigures", async () => {
-      const result = await service.apply({ testPlugin: { size: 7 } });
+      const result = await service.apply("user", { testPlugin: { size: 7 } });
       expect(result).toEqual({ ok: true });
 
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 7 } });
       expect(fs.readFileSync(overridesFile, "utf8")).toStartWith("# TokenRing user configuration overrides.");
       expect(fs.existsSync(`${overridesFile}.tmp`)).toBe(false);
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
 
       expect((fullConfig as any).testPlugin.size).toBe(7);
       expect(reconfigureSpy).toHaveBeenCalledTimes(1);
       expect((reconfigureSpy.mock.calls[0] as any)[1].testPlugin.size).toBe(7);
     });
 
+    it("writes to the user layer only, leaving the layers around it alone", async () => {
+      await service.apply("user", { testPlugin: { size: 7 } });
+
+      const state = app.stateManager.getState(AppConfigurationState);
+      expect(state.userConfig).toEqual({ testPlugin: { size: 7 } });
+      expect((state.appConfig as any).testPlugin.size).toBe(5);
+      expect(state.projectConfig).toEqual({});
+    });
+
+    it("rolls the user layer back when a plugin rejects the new config", async () => {
+      reconfigureSpy.mockImplementationOnce(() => {
+        throw new Error("plugin refused the config");
+      });
+
+      await expect(service.apply("user", { testPlugin: { size: 7 } })).rejects.toThrow("plugin refused the config");
+
+      expect(fs.existsSync(overridesFile)).toBe(false);
+      expect(service.getOverrides("user")).toEqual({});
+      expect((app.stateManager.getState(AppConfigurationState).mergedConfig as any).testPlugin.size).toBe(5);
+    });
+
     it("prunes values equal to the effective base config", async () => {
-      const result = await service.apply({ testPlugin: { size: 5, name: "base-name", nested: { flag: false } } });
-      expect(result).toEqual({ ok: true,  });
+      const result = await service.apply("user", { testPlugin: { size: 5, name: "base-name", nested: { flag: false } } });
+      expect(result).toEqual({ ok: true });
       expect(readOverridesFile()).toBeNull();
-      expect(service.getOverrides()).toEqual({});
+      expect(service.getOverrides("user")).toEqual({});
     });
 
     it("keeps overrides that differ from base even when equal to the schema default", async () => {
       // base sets size 5; the schema default is 10 — an override of 10 is a real deviation
-      await service.apply({ testPlugin: { size: 10 } });
+      await service.apply("user", { testPlugin: { size: 10 } });
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 10 } });
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin.size).toBe(10);
     });
 
     it("keeps an empty object override that enables an absent slice", async () => {
-      await service.apply({ other: { value: "x" }, testPlugin: {} });
+      await service.apply("user", { other: { value: "x" }, testPlugin: {} });
       expect(readOverridesFile()).toEqual({ other: { value: "x" } });
     });
 
     it("rejects invalid values with pathed issues and persists nothing", async () => {
-      const result = await service.apply({ testPlugin: { size: 0 } });
+      const result = await service.apply("user", { testPlugin: { size: 0 } });
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error("unreachable");
       expect(result.issues[0]!.path).toEqual(["testPlugin", "size"]);
 
       expect(fs.existsSync(overridesFile)).toBe(false);
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin.size).toBe(5);
       expect(reconfigureSpy).not.toHaveBeenCalled();
     });
 
     it("rejects unknown top-level keys", async () => {
-      const result = await service.apply({ nonsense: { foo: 1 } });
+      const result = await service.apply("user", { nonsense: { foo: 1 } });
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error("unreachable");
       expect(result.issues[0]!.message).toContain("nonsense");
     });
 
     it("serializes concurrent applies", async () => {
-      const [first, second] = await Promise.all([service.apply({ testPlugin: { size: 6 } }), service.apply({ testPlugin: { size: 7 } })]);
+      const [first, second] = await Promise.all([service.apply("user", { testPlugin: { size: 6 } }), service.apply("user", { testPlugin: { size: 7 } })]);
       expect(first.ok).toBe(true);
       expect(second.ok).toBe(true);
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 7 } });
@@ -182,25 +202,25 @@ describe("ConfigurationService", () => {
 
   describe("sensitive values", () => {
     it("redacts sensitive values on read but persists them in plaintext", async () => {
-      await service.apply({ testPlugin: { apiKey: "secret123" } });
+      await service.apply("user", { testPlugin: { apiKey: "secret123" } });
 
       const { effective, overrides } = service.getRedactedValues();
       expect((effective.testPlugin as any).apiKey).toEqual({ __sensitive: true, isSet: true });
-      expect((overrides.testPlugin as any).apiKey).toEqual({ __sensitive: true, isSet: true });
+      expect((overrides.user.testPlugin as any).apiKey).toEqual({ __sensitive: true, isSet: true });
       expect(JSON.stringify(effective)).not.toContain("secret123");
 
       expect((readOverridesFile() as any).testPlugin.apiKey).toBe("secret123");
     });
 
     it("preserves the stored secret when the client sends the keep sentinel", async () => {
-      await service.apply({ testPlugin: { apiKey: "secret123" } });
-      const result = await service.apply({ testPlugin: { apiKey: { __sensitive: "keep" }, size: 7 } });
+      await service.apply("user", { testPlugin: { apiKey: "secret123" } });
+      const result = await service.apply("user", { testPlugin: { apiKey: { __sensitive: "keep" }, size: 7 } });
       expect(result.ok).toBe(true);
       expect(readOverridesFile()).toEqual({ testPlugin: { apiKey: "secret123", size: 7 } });
     });
 
     it("redacts sensitive fields inside variant map entries", async () => {
-      await service.apply({ testPlugin: { providers: { main: { kind: "secure", token: "tok-123" } } } });
+      await service.apply("user", { testPlugin: { providers: { main: { kind: "secure", token: "tok-123" } } } });
 
       const { effective } = service.getRedactedValues();
       const main = (effective.testPlugin as any).providers.main;
@@ -210,15 +230,71 @@ describe("ConfigurationService", () => {
     });
 
     it("drops the keep sentinel when no secret is stored", async () => {
-      const result = await service.apply({ testPlugin: { apiKey: { __sensitive: "keep" }, size: 7 } });
+      const result = await service.apply("user", { testPlugin: { apiKey: { __sensitive: "keep" }, size: 7 } });
       expect(result.ok).toBe(true);
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 7 } });
     });
   });
 
+  describe("scopes", () => {
+    const readProjectOverridesFile = () => YAML.parse(fs.readFileSync(projectOverridesFile, "utf8")) as Record<string, unknown> | null;
+
+    it("persists each scope to its own file and layers project over user", async () => {
+      await service.apply("user", { testPlugin: { size: 7, name: "from-user" } });
+      await service.apply("project", { testPlugin: { size: 8 } });
+
+      expect(readOverridesFile()).toEqual({ testPlugin: { size: 7, name: "from-user" } });
+      expect(readProjectOverridesFile()).toEqual({ testPlugin: { size: 8 } });
+      expect(fs.readFileSync(projectOverridesFile, "utf8")).toStartWith("# TokenRing project configuration overrides.");
+
+      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
+      expect((fullConfig as any).testPlugin).toMatchObject({ size: 8, name: "from-user" });
+    });
+
+    it("prunes a project value that the user layer already sets", async () => {
+      await service.apply("user", { testPlugin: { size: 7 } });
+      await service.apply("project", { testPlugin: { size: 7 } });
+
+      expect(readProjectOverridesFile()).toBeNull();
+      expect(service.getOverrides("project")).toEqual({});
+      expect((app.stateManager.getState(AppConfigurationState).mergedConfig as any).testPlugin.size).toBe(7);
+    });
+
+    it("reports the overrides of every scope separately", async () => {
+      await service.apply("user", { testPlugin: { size: 7 } });
+      await service.apply("project", { testPlugin: { name: "from-project" } });
+
+      expect(service.getRedactedValues().overrides).toEqual({
+        user: { testPlugin: { size: 7 } },
+        project: { testPlugin: { name: "from-project" } },
+      });
+    });
+
+    it("resets a path within one scope only", async () => {
+      await service.apply("user", { testPlugin: { size: 7 } });
+      await service.apply("project", { testPlugin: { name: "from-project" } });
+
+      await service.resetPath("project", ["testPlugin", "name"]);
+
+      expect(service.getOverrides("project")).toEqual({});
+      expect(service.getOverrides("user")).toEqual({ testPlugin: { size: 7 } });
+    });
+
+    it("keeps sensitive sentinels per scope", async () => {
+      await service.apply("user", { testPlugin: { apiKey: "user-secret" } });
+      await service.apply("project", { testPlugin: { apiKey: "project-secret" } });
+
+      // The keep sentinel resolves against the scope being written, not the other one.
+      await service.apply("project", { testPlugin: { apiKey: { __sensitive: "keep" }, size: 7 } });
+
+      expect(readProjectOverridesFile()).toEqual({ testPlugin: { apiKey: "project-secret", size: 7 } });
+      expect(readOverridesFile()).toEqual({ testPlugin: { apiKey: "user-secret" } });
+    });
+  });
+
   describe("validateOverrides", () => {
     it("does not persist or reconfigure", () => {
-      const result = service.validateOverrides({ testPlugin: { size: 7 } });
+      const result = service.validateOverrides("user", { testPlugin: { size: 7 } });
       expect(result.ok).toBe(true);
       expect(fs.existsSync(overridesFile)).toBe(false);
       expect(reconfigureSpy).not.toHaveBeenCalled();
@@ -227,22 +303,22 @@ describe("ConfigurationService", () => {
 
   describe("resetPath", () => {
     it("removes a single override path and prunes empty parents", async () => {
-      await service.apply({ testPlugin: { size: 7, name: "custom" } });
-      await service.resetPath(["testPlugin", "size"]);
+      await service.apply("user", { testPlugin: { size: 7, name: "custom" } });
+      await service.resetPath("user", ["testPlugin", "size"]);
       expect(readOverridesFile()).toEqual({ testPlugin: { name: "custom" } });
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin.size).toBe(5);
 
-      await service.resetPath(["testPlugin", "name"]);
+      await service.resetPath("user", ["testPlugin", "name"]);
       expect(readOverridesFile()).toBeNull();
     });
 
     it("clears everything with an empty path", async () => {
-      await service.apply({ testPlugin: { size: 7 } });
-      await service.resetPath([]);
+      await service.apply("user", { testPlugin: { size: 7 } });
+      await service.resetPath("user", []);
       expect(readOverridesFile()).toBeNull();
-      expect(service.getOverrides()).toEqual({});
+      expect(service.getOverrides("user")).toEqual({});
     });
   });
 

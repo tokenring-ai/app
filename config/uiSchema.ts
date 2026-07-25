@@ -129,6 +129,23 @@ export interface ConfigVariantNode extends ConfigUINodeBase {
   variants: Record<string, ConfigGroupNode>;
 }
 
+/**
+ * A sourced value (see @tokenring-ai/secrets) — the UI shows a source selector
+ * for literal value / environment variable / vault entry, and the inputs for
+ * the selected source. Only the literal form of a sensitive one is a secret;
+ * the env and vault forms are pointers and are never redacted.
+ */
+export interface ConfigSecretNode extends ConfigUINodeBase {
+  kind: "secret";
+  required: boolean;
+  /** Whether the literal form holds a credential — masked and redacted when true. */
+  sensitive?: boolean | undefined;
+  defaultValue?: unknown;
+  restartRequired?: boolean | undefined;
+  advanced?: boolean | undefined;
+  placeholder?: string | undefined;
+}
+
 /** Subtree the walker could not map — the UI falls back to a raw YAML editor. */
 export interface ConfigOpaqueNode extends ConfigUINodeBase {
   kind: "opaque";
@@ -138,7 +155,7 @@ export interface ConfigOpaqueNode extends ConfigUINodeBase {
   advanced?: boolean | undefined;
 }
 
-export type ConfigUINode = ConfigGroupNode | ConfigFieldNode | ConfigListNode | ConfigMapNode | ConfigVariantNode | ConfigOpaqueNode;
+export type ConfigUINode = ConfigGroupNode | ConfigFieldNode | ConfigListNode | ConfigMapNode | ConfigVariantNode | ConfigSecretNode | ConfigOpaqueNode;
 
 const ConfigUINodeBaseShape = {
   key: z.string(),
@@ -182,6 +199,16 @@ export const ConfigUINodeSchema: z.ZodType<ConfigUINode> = z.lazy(() =>
       kind: z.literal("variant"),
       discriminator: z.string(),
       variants: z.record(z.string(), ConfigUINodeSchema),
+    }),
+    z.object({
+      ...ConfigUINodeBaseShape,
+      kind: z.literal("secret"),
+      required: z.boolean(),
+      sensitive: z.boolean().optional(),
+      defaultValue: z.unknown().optional(),
+      restartRequired: z.boolean().optional(),
+      advanced: z.boolean().optional(),
+      placeholder: z.string().optional(),
     }),
     z.object({
       ...ConfigUINodeBaseShape,

@@ -1,12 +1,12 @@
 import deepClone from "@tokenring-ai/utility/object/deepClone";
 import type { z } from "zod";
 import PluginManager from "../PluginManager.ts";
-import type { TokenRingAppConfig } from "../schema.ts";
-import { AppConfigurationState } from "../state/AppConfigurationState.ts";
+import { AppConfigurationState, type ConfigLayer } from "../state/AppConfigurationState.ts";
 import type TokenRingApp from "../TokenRingApp.ts";
 import type { TokenRingService } from "../types.ts";
 import buildConfigUISchema from "./buildConfigUISchema.ts";
 import { deleteAtPath, pruneToOverrides, redactSensitiveValues, resolveSensitiveSentinels } from "./overrides.ts";
+import { type ConfigScope, configScopes } from "./scopes.ts";
 import type { ConfigUIPluginSchema } from "./uiSchema.ts";
 import writeYamlAtomic from "./writeYamlAtomic.ts";
 
@@ -20,38 +20,36 @@ export type ConfigApplyResult = { ok: true } | { ok: false; issues: ConfigValida
 export interface ConfigurationServiceOptions {
   /** The composed app config schema (all plugin shapes merged). */
   configSchema: z.ZodTypeAny;
-  /** Merged CLI defaults + configDirectories YAML, before user overrides. */
-  baseConfig: unknown;
-  /** File the sparse user overrides are persisted to (~/.tokenring/config.yaml). */
-  overridesFile: string;
-  /** Overrides as loaded at boot ({} when the file is absent or was rejected). */
-  overrides?: Record<string, unknown>;
-  /** Boot-time error when the overrides file was rejected, for the UI banner. */
+  /** File each override scope is persisted to. */
+  overridesFiles: Record<ConfigScope, string>;
+  /** Boot-time error when an overrides file was rejected, for the UI banner. */
   overlayError?: string | undefined;
 }
 
-const OVERRIDES_HEADER = `# TokenRing user configuration overrides.
-# Managed by the TokenRing configuration UI; hand edits are preserved per-key.`;
+const OVERRIDES_HEADERS: Record<ConfigScope, string> = {
+  user: `# TokenRing user configuration overrides.
+# Managed by the TokenRing configuration UI; hand edits are preserved per-key.`,
+  project: `# TokenRing project configuration overrides. These take precedence over
+# the user configuration.
+# Managed by the TokenRing configuration UI; hand edits are preserved per-key.`,
+};
 
 /**
- * Owns the user configuration override layer: exposes generated UI schemas and
- * redacted values, validates candidate overrides against the composed config
- * schema, persists them to the overrides file, and live-reconfigures plugins.
+ * Owns the editable override layers of {@link AppConfigurationState} — the user
+ * layer and the project layer, which takes precedence over it: exposes
+ * generated UI schemas and redacted values, validates candidate overrides
+ * against the composed config schema, swaps the running layer, persists it to
+ * that scope's file, and live-reconfigures plugins.
  */
 export default class ConfigurationService implements TokenRingService {
   readonly name = "ConfigurationService";
-  readonly description = "Manages user configuration overrides and live plugin reconfiguration";
+  readonly description = "Manages user and project configuration overrides and live plugin reconfiguration";
 
-  /** Sticky: set once any applied change could not be live-reconfigured. */
-  //restartRequired = false;
   readonly overlayError: string | undefined;
-  readonly overridesFile: string;
+  readonly overridesFiles: Record<ConfigScope, string>;
 
   private readonly configSchema: z.ZodTypeAny;
-  private readonly baseConfig: object;
-  private overrides: Record<string, unknown>;
-  private parsedBaseCache: unknown;
-  private uiSchemaCache: ConfigUIPluginSchema[] | undefined;
+  private uiSchemaCache: { generation: number; uiSchemas: ConfigUIPluginSchema[] } | undefined;
   private applyQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -59,71 +57,78 @@ export default class ConfigurationService implements TokenRingService {
     options: ConfigurationServiceOptions,
   ) {
     this.configSchema = options.configSchema;
-    this.baseConfig = deepClone(options.baseConfig as object);
-    this.overridesFile = options.overridesFile;
-    this.overrides = deepClone(options.overrides ?? {});
+    this.overridesFiles = { ...options.overridesFiles };
     this.overlayError = options.overlayError;
   }
 
-  /** Generated UI schemas for every installed plugin with configurable content. */
+  /**
+   * Generated UI schemas for every installed plugin with configurable content.
+   * Rebuilt whenever the installed plugin set changes.
+   */
   getUISchemas(): ConfigUIPluginSchema[] {
-    if (!this.uiSchemaCache) {
-      const pluginManager = this.app.requireService(PluginManager);
-      this.uiSchemaCache = pluginManager
+    const pluginManager = this.app.requireService(PluginManager);
+    if (this.uiSchemaCache?.generation !== pluginManager.generation) {
+      const uiSchemas = pluginManager
         .getPlugins()
         .filter(plugin => "configSchema" in plugin)
         .map(plugin => buildConfigUISchema(plugin))
         .filter((uiSchema): uiSchema is ConfigUIPluginSchema => uiSchema !== null && Object.keys(uiSchema.slices).length > 0);
+      this.uiSchemaCache = { generation: pluginManager.generation, uiSchemas };
     }
-    return this.uiSchemaCache;
+    return this.uiSchemaCache.uiSchemas;
   }
 
-  getOverrides(): Record<string, unknown> {
-    return deepClone(this.overrides);
+  getOverrides(scope: ConfigScope): ConfigLayer {
+    return deepClone(this.configState.getOverrideLayer(scope));
   }
 
-  /** base ⊕ overrides, parsed with the composed schema. */
+  /** The running merged configuration, parsed with the composed schema. */
   getEffectiveConfig(): unknown {
-    return this.configSchema.parse(deepClone(this.baseConfig, this.overrides));
+    return this.configSchema.parse(this.configState.mergedConfig);
   }
 
   /**
-   * Effective config and current overrides for every UI-schema-covered config
-   * slice, with sensitive values redacted to `{ __sensitive: true, isSet }`.
+   * Effective config and the overrides of every scope, for each UI-schema-covered
+   * config slice, with sensitive values redacted to `{ __sensitive: true, isSet }`.
    * Slices without a UI schema are never sent to the client.
    */
-  getRedactedValues(): { effective: Record<string, unknown>; overrides: Record<string, unknown> } {
+  getRedactedValues(): { effective: Record<string, unknown>; overrides: Record<ConfigScope, Record<string, unknown>> } {
     const effectiveConfig = this.getEffectiveConfig() as Record<string, unknown>;
     const effective: Record<string, unknown> = {};
-    const overrides: Record<string, unknown> = {};
+    const overrides = Object.fromEntries(configScopes.map(scope => [scope, {} as Record<string, unknown>])) as Record<ConfigScope, Record<string, unknown>>;
 
     for (const uiSchema of this.getUISchemas()) {
       for (const [key, node] of Object.entries(uiSchema.slices)) {
         const effectiveSlice = redactSensitiveValues(node, effectiveConfig[key]);
         if (effectiveSlice !== undefined) effective[key] = effectiveSlice;
-        const overrideSlice = redactSensitiveValues(node, this.overrides[key]);
-        if (overrideSlice !== undefined) overrides[key] = overrideSlice;
+
+        for (const scope of configScopes) {
+          const overrideSlice = redactSensitiveValues(node, this.configState.getOverrideLayer(scope)[key]);
+          if (overrideSlice !== undefined) overrides[scope][key] = overrideSlice;
+        }
       }
     }
     return { effective, overrides };
   }
 
   /**
-   * Validates a candidate override set (the full desired set, not a patch).
-   * Resolves sensitive sentinels, prunes values that match the base config,
-   * and parses the merged result with the composed schema.
+   * Validates a candidate override set for one scope (the full desired set for
+   * that scope, not a patch). Resolves sensitive sentinels, prunes values that
+   * match the layers below it, and parses the merged result with the composed
+   * schema.
    */
   validateOverrides(
-    candidateOverrides: Record<string, unknown>,
-  ): { ok: true; normalized: Record<string, unknown>; parsed: unknown } | { ok: false; issues: ConfigValidationIssue[] } {
+    scope: ConfigScope,
+    candidateOverrides: ConfigLayer,
+  ): { ok: true; normalized: ConfigLayer; parsed: unknown } | { ok: false; issues: ConfigValidationIssue[] } {
     const keyIssues = this.checkAllowedKeys(candidateOverrides);
     if (keyIssues.length > 0) return { ok: false, issues: keyIssues };
 
-    const resolved = resolveSensitiveSentinels(candidateOverrides, this.overrides) as Record<string, unknown>;
-    const normalized = (pruneToOverrides(resolved, this.parsedBase) ?? {}) as Record<string, unknown>;
+    const state = this.configState;
+    const resolved = resolveSensitiveSentinels(candidateOverrides, state.getOverrideLayer(scope)) as ConfigLayer;
+    const normalized = (pruneToOverrides(resolved, this.parsedLayersBelow(scope)) ?? {}) as ConfigLayer;
 
-    const merged = deepClone(this.baseConfig, normalized);
-    const result = this.configSchema.safeParse(merged);
+    const result = this.configSchema.safeParse(state.previewWithOverrideLayer(scope, normalized));
     if (!result.success) {
       return {
         ok: false,
@@ -134,13 +139,13 @@ export default class ConfigurationService implements TokenRingService {
   }
 
   /**
-   * Validates, live-reconfigures plugins, swaps the running app config, and
-   * persists the overrides file — in that order, so a config the running app
-   * rejected is never written to disk. Serialized: concurrent calls run one
-   * at a time.
+   * Validates, swaps the running config layer for `scope`, live-reconfigures
+   * plugins, and only then persists that scope's overrides file — so a config
+   * the running app rejected is never written to disk. Serialized: concurrent
+   * calls run one at a time.
    */
-  apply(candidateOverrides: Record<string, unknown>): Promise<ConfigApplyResult> {
-    const run = this.applyQueue.then(() => this.doApply(candidateOverrides));
+  apply(scope: ConfigScope, candidateOverrides: ConfigLayer): Promise<ConfigApplyResult> {
+    const run = this.applyQueue.then(() => this.doApply(scope, candidateOverrides));
     this.applyQueue = run.then(
       () => {},
       () => {},
@@ -148,32 +153,46 @@ export default class ConfigurationService implements TokenRingService {
     return run;
   }
 
-  /** Removes the override at `path` (empty path clears all) and re-applies. */
-  resetPath(path: string[]): Promise<ConfigApplyResult> {
-    const next = this.getOverrides();
+  /** Removes the override at `path` in `scope` (empty path clears all) and re-applies. */
+  resetPath(scope: ConfigScope, path: string[]): Promise<ConfigApplyResult> {
+    const next = this.getOverrides(scope);
     deleteAtPath(next, path);
-    return this.apply(next);
+    return this.apply(scope, next);
   }
 
-  private doApply(candidateOverrides: Record<string, unknown>): ConfigApplyResult {
-    const validation = this.validateOverrides(candidateOverrides);
+  private async doApply(scope: ConfigScope, candidateOverrides: ConfigLayer): Promise<ConfigApplyResult> {
+    const validation = this.validateOverrides(scope, candidateOverrides);
     if (!validation.ok) return validation;
-    const { normalized, parsed } = validation;
+    const { normalized } = validation;
 
-    AppConfigurationState.replaceConfig(parsed as TokenRingAppConfig, this.app);
+    const previous = this.getOverrides(scope);
+    AppConfigurationState.setOverrideLayer(this.app, scope, normalized);
 
-    writeYamlAtomic(this.overridesFile, normalized, OVERRIDES_HEADER);
-    this.overrides = normalized;
+    const pluginManager = this.app.getService(PluginManager);
+    try {
+      await pluginManager?.reconfigurePlugins();
+    } catch (error: unknown) {
+      // Roll the running app back to the configuration it was happy with.
+      AppConfigurationState.setOverrideLayer(this.app, scope, previous);
+      await pluginManager?.reconfigurePlugins().catch(() => {});
+      throw error;
+    }
+
+    writeYamlAtomic(this.overridesFiles[scope], normalized, OVERRIDES_HEADERS[scope]);
 
     return { ok: true };
   }
 
-  private get parsedBase(): unknown {
-    this.parsedBaseCache ??= this.configSchema.parse(this.baseConfig);
-    return this.parsedBaseCache;
+  /** Everything below `scope`, parsed with the composed schema. */
+  private parsedLayersBelow(scope: ConfigScope): unknown {
+    return this.configSchema.parse(this.configState.getLayersBelow(scope));
   }
 
-  private checkAllowedKeys(candidateOverrides: Record<string, unknown>): ConfigValidationIssue[] {
+  private get configState(): AppConfigurationState {
+    return this.app.stateManager.getState(AppConfigurationState);
+  }
+
+  private checkAllowedKeys(candidateOverrides: ConfigLayer): ConfigValidationIssue[] {
     const allowedKeys = new Set<string>();
     for (const uiSchema of this.getUISchemas()) {
       for (const key of Object.keys(uiSchema.slices)) allowedKeys.add(key);

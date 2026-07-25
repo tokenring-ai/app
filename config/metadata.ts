@@ -21,6 +21,12 @@ export interface ConfigFieldMeta {
   categories?: Record<string, { label: string; value: string }[]>;
   /** Redact on read, mask input, write-only round-trip. */
   sensitive?: boolean;
+  /**
+   * Marks a secret reference (see ./secret.ts) — the UI renders a source
+   * selector for literal / environment variable / vault. Set by `secret()`;
+   * plugin authors don't set this directly.
+   */
+  secret?: boolean;
   /** Changing this field always requires an app restart. */
   restartRequired?: boolean;
   /** Collapse into an "Advanced" disclosure in the UI. */

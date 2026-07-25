@@ -4,28 +4,31 @@ import { isPlainObject } from "@tokenring-ai/utility/object/isPlainObject";
 import { file, Glob, YAML } from "bun";
 import type { z } from "zod";
 import type { TokenRingAppConfigSchema } from "./schema.ts";
+import type { ConfigLayer } from "./state/AppConfigurationState.ts";
 
 export interface BuildConfigOptions {
-  /** Sparse user override file applied last (highest precedence), e.g. ~/.tokenring/config.yaml. */
+  /** Sparse user override file, e.g. ~/.tokenring/config.yaml. */
   userOverridesFile?: string;
+  /** Sparse project override file, e.g. <projectDirectory>/.tokenring/config.yaml. */
+  projectOverridesFile?: string;
 }
 
 export interface TokenRingAppConfigLayers<T extends z.ZodTypeAny> {
-  /** Fully merged and parsed config (defaults ⊕ configDirectories ⊕ user overrides). */
-  config: z.output<T>;
-  /** Merged defaults + configDirectories YAML, before user overrides (input format). */
-  baseConfig: unknown;
-  /** User overrides as loaded ({} when absent or rejected). */
-  overrides: Record<string, unknown>;
-  /** Set when the user overrides file exists but was rejected; config then excludes it. */
+  /** CLI defaults ⊕ configDirectories YAML, parsed — the immutable app layer. */
+  appConfig: z.output<T>;
+  /** Sparse user overrides as loaded ({} when absent or rejected). */
+  userConfig: ConfigLayer;
+  /** Sparse project overrides as loaded ({} when absent or rejected). */
+  projectConfig: ConfigLayer;
+  /** Set when an override file exists but was rejected; that layer is then empty. */
   overlayError: string | undefined;
 }
 
 /**
- * Builds the app config in layers: CLI-derived defaults, then every
- * `**\/*.yaml` in each config directory, then the user override file. A
- * rejected override file never prevents boot — the config falls back to the
- * pre-override layers and the error is surfaced for the configuration UI.
+ * Builds the app config layers: the app layer (CLI-derived defaults, then every
+ * `**\/*.yaml` in each config directory), plus the sparse user and project
+ * override layers. A rejected override file never prevents boot — that layer is
+ * dropped and the error is surfaced for the configuration UI.
  */
 export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
   configSchema: T,
@@ -40,7 +43,6 @@ export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
   const glob = new Glob("**/*.yaml");
 
   let mergedConfig = defaultConfig;
-  let parsedConfig = configSchema.parse(defaultConfig) as z.output<T>;
 
   // Try each directory and extension in order
   for (const dir of configDirectories) {
@@ -50,37 +52,49 @@ export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
         const configContent = await file(config).text();
         const parsedYaml = YAML.parse(configContent);
         mergedConfig = deepClone(mergedConfig, parsedYaml as {});
-        parsedConfig = configSchema.parse(mergedConfig) as z.output<T>;
       }
     }
   }
 
-  let overrides: Record<string, unknown> = {};
-  let overlayError: string | undefined;
+  const appConfig = configSchema.parse(mergedConfig) as z.output<T>;
 
-  const { userOverridesFile } = options;
-  if (userOverridesFile && fs.existsSync(userOverridesFile)) {
+  const overlayErrors: string[] = [];
+  const overlays: ConfigLayer[] = [];
+
+  /** Loads one sparse overlay, validating it on top of the layers below it. */
+  const loadOverlay = async (overlayFile: string | undefined): Promise<ConfigLayer> => {
+    if (!overlayFile || !fs.existsSync(overlayFile)) return {};
     try {
-      const parsedYaml = YAML.parse(await file(userOverridesFile).text());
-      if (parsedYaml != null) {
-        if (!isPlainObject(parsedYaml)) {
-          throw new Error("Expected a YAML mapping at the top level");
-        }
-        parsedConfig = configSchema.parse(deepClone(mergedConfig, parsedYaml)) as z.output<T>;
-        overrides = parsedYaml as Record<string, unknown>;
+      const parsedYaml = YAML.parse(await file(overlayFile).text());
+      if (parsedYaml == null) return {};
+      if (!isPlainObject(parsedYaml)) {
+        throw new Error("Expected a YAML mapping at the top level");
       }
+      configSchema.parse(deepClone(mergedConfig, ...overlays, parsedYaml));
+      return parsedYaml as ConfigLayer;
     } catch (error: unknown) {
-      overlayError = `User configuration overrides in ${userOverridesFile} were rejected and are not active: ${(error as Error).message}`;
+      overlayErrors.push(`Configuration overrides in ${overlayFile} were rejected and are not active: ${(error as Error).message}`);
+      return {};
     }
-  }
+  };
 
-  return { config: parsedConfig, baseConfig: mergedConfig, overrides, overlayError };
+  const userConfig = await loadOverlay(options.userOverridesFile);
+  overlays.push(userConfig);
+  const projectConfig = await loadOverlay(options.projectOverridesFile);
+
+  return {
+    appConfig,
+    userConfig,
+    projectConfig,
+    overlayError: overlayErrors.length > 0 ? overlayErrors.join("\n") : undefined,
+  };
 }
 
 export default async function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
   configSchema: T,
   defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>,
+  options: BuildConfigOptions = {},
 ): Promise<z.output<T>> {
-  const { config } = await buildTokenRingAppConfigLayers(configSchema, defaultConfig);
-  return config;
+  const { appConfig, userConfig, projectConfig } = await buildTokenRingAppConfigLayers(configSchema, defaultConfig, options);
+  return configSchema.parse(deepClone(appConfig as object, userConfig, projectConfig)) as z.output<T>;
 }

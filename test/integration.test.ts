@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { setTimeout as delay } from "node:timers/promises";
 import PluginManager from "../PluginManager";
-import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import StateManager from "../StateManager";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import TokenRingApp from "../TokenRingApp";
 import type { TokenRingPlugin, TokenRingService } from "../types";
 import createTestingApp from "./createTestingApp.test";
@@ -263,15 +263,13 @@ describe("App Integration Tests", () => {
       class ServiceA implements TokenRingService {
         readonly name = "ServiceA";
         description = "Service A";
-        run = mock().mockImplementation(async () => {
-        });
+        run = mock().mockImplementation(async () => {});
       }
 
       class ServiceB implements TokenRingService {
         readonly name = "ServiceB";
         description = "Service B";
-        run = mock().mockImplementation(async () => {
-        });
+        run = mock().mockImplementation(async () => {});
       }
 
       const serviceA = new ServiceA();
@@ -363,7 +361,7 @@ describe("App Integration Tests", () => {
         printLogs: false,
       });
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).config;
+      const fullConfig = appWithConfig.stateManager.getState(AppConfigurationState).mergedConfig;
       expect(fullConfig).toEqual({
         app: {
           dataDirectory: "/tmp",

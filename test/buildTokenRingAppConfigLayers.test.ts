@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import { buildTokenRingAppConfigLayers } from "../buildTokenRingAppConfig.ts";
+import buildTokenRingAppConfig, { buildTokenRingAppConfigLayers } from "../buildTokenRingAppConfig.ts";
 import { TokenRingAppConfigSchema } from "../schema.ts";
 
 const composedSchema = z.object({
@@ -21,12 +21,14 @@ describe("buildTokenRingAppConfigLayers", () => {
   let configDir: string;
   let dataDir: string;
   let overridesFile: string;
+  let projectOverridesFile: string;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "trlayers-"));
     configDir = path.join(tempDir, "configs");
     dataDir = path.join(tempDir, "data");
     overridesFile = path.join(tempDir, "user", "config.yaml");
+    projectOverridesFile = path.join(tempDir, "project.config.yaml");
     fs.mkdirSync(configDir, { recursive: true });
   });
 
@@ -42,23 +44,42 @@ describe("buildTokenRingAppConfigLayers", () => {
     },
   });
 
-  it("applies layers in order: defaults, config directories, user overrides", async () => {
+  it("separates the app layer from the sparse user and project layers", async () => {
     fs.writeFileSync(path.join(configDir, "site.yaml"), "feature:\n  x: 2\n  y: fromDir\n");
     fs.mkdirSync(path.dirname(overridesFile), { recursive: true });
     fs.writeFileSync(overridesFile, "feature:\n  y: fromUser\n");
+    fs.writeFileSync(projectOverridesFile, "feature:\n  x: 3\n");
 
-    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
+    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), {
+      userOverridesFile: overridesFile,
+      projectOverridesFile,
+    });
 
-    expect(layers.config.feature).toEqual({ x: 2, y: "fromUser" });
-    expect((layers.baseConfig as any).feature).toEqual({ x: 2, y: "fromDir" });
-    expect(layers.overrides).toEqual({ feature: { y: "fromUser" } });
+    expect(layers.appConfig.feature).toEqual({ x: 2, y: "fromDir" });
+    expect(layers.userConfig).toEqual({ feature: { y: "fromUser" } });
+    expect(layers.projectConfig).toEqual({ feature: { x: 3 } });
     expect(layers.overlayError).toBeUndefined();
+  });
+
+  it("merges every layer in the default export, project winning over user", async () => {
+    fs.writeFileSync(path.join(configDir, "site.yaml"), "feature:\n  x: 2\n  y: fromDir\n");
+    fs.mkdirSync(path.dirname(overridesFile), { recursive: true });
+    fs.writeFileSync(overridesFile, "feature:\n  x: 5\n  y: fromUser\n");
+    fs.writeFileSync(projectOverridesFile, "feature:\n  x: 3\n");
+
+    const config = await buildTokenRingAppConfig(composedSchema, defaultConfig(), {
+      userOverridesFile: overridesFile,
+      projectOverridesFile,
+    });
+
+    expect(config.feature).toEqual({ x: 3, y: "fromUser" });
   });
 
   it("is a no-op when the overrides file is missing", async () => {
     const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
-    expect(layers.config.feature).toEqual({ x: 1, y: "default" });
-    expect(layers.overrides).toEqual({});
+    expect(layers.appConfig.feature).toEqual({ x: 1, y: "default" });
+    expect(layers.userConfig).toEqual({});
+    expect(layers.projectConfig).toEqual({});
     expect(layers.overlayError).toBeUndefined();
   });
 
@@ -67,8 +88,8 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.writeFileSync(overridesFile, "feature: [unclosed\n");
 
     const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
-    expect(layers.config.feature).toEqual({ x: 1, y: "default" });
-    expect(layers.overrides).toEqual({});
+    expect(layers.appConfig.feature).toEqual({ x: 1, y: "default" });
+    expect(layers.userConfig).toEqual({});
     expect(layers.overlayError).toContain(overridesFile);
   });
 
@@ -78,8 +99,8 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.writeFileSync(overridesFile, "feature:\n  x: notanumber\n");
 
     const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
-    expect(layers.config.feature.x).toBe(2);
-    expect(layers.overrides).toEqual({});
+    expect(layers.appConfig.feature.x).toBe(2);
+    expect(layers.userConfig).toEqual({});
     expect(layers.overlayError).toContain(overridesFile);
   });
 
@@ -88,7 +109,22 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.writeFileSync(overridesFile, "- a\n- b\n");
 
     const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
-    expect(layers.overrides).toEqual({});
+    expect(layers.userConfig).toEqual({});
     expect(layers.overlayError).toContain("mapping");
+  });
+
+  it("keeps the user layer when only the project layer is rejected", async () => {
+    fs.mkdirSync(path.dirname(overridesFile), { recursive: true });
+    fs.writeFileSync(overridesFile, "feature:\n  y: fromUser\n");
+    fs.writeFileSync(projectOverridesFile, "feature:\n  x: notanumber\n");
+
+    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), {
+      userOverridesFile: overridesFile,
+      projectOverridesFile,
+    });
+
+    expect(layers.userConfig).toEqual({ feature: { y: "fromUser" } });
+    expect(layers.projectConfig).toEqual({});
+    expect(layers.overlayError).toContain(projectOverridesFile);
   });
 });

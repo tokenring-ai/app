@@ -1,10 +1,21 @@
 import { z } from "zod";
+import { configScopes } from "../config/scopes.ts";
 import { ConfigUIPluginSchemaSchema } from "../config/uiSchema.ts";
 
 export const ConfigIssueSchema = z.object({
   path: z.array(z.union([z.string(), z.number()])),
   message: z.string(),
 });
+
+/** Which override layer a read or write targets. `project` takes precedence over `user`. */
+export const ConfigScopeSchema = z.enum(configScopes);
+
+const ScopedRecordSchema = z.object(
+  Object.fromEntries(configScopes.map(scope => [scope, z.record(z.string(), z.unknown())])) as Record<
+    (typeof configScopes)[number],
+    z.ZodRecord<z.ZodString, z.ZodUnknown>
+  >,
+);
 
 const ApplyResultSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true) }),
@@ -28,7 +39,8 @@ const ConfigRpcSchema = {
       input: z.object({}),
       result: z.object({
         plugins: z.array(ConfigUIPluginSchemaSchema),
-        overridesFile: z.string(),
+        /** The file each scope is persisted to. */
+        overridesFiles: z.object(Object.fromEntries(configScopes.map(scope => [scope, z.string()])) as Record<(typeof configScopes)[number], z.ZodString>),
         overlayError: z.string().nullable(),
       }),
     },
@@ -37,23 +49,24 @@ const ConfigRpcSchema = {
       input: z.object({}),
       result: z.object({
         effective: z.record(z.string(), z.unknown()),
-        overrides: z.record(z.string(), z.unknown()),
+        /** Overrides per scope, so the UI can show which layer a value comes from. */
+        overrides: ScopedRecordSchema,
       }),
     },
     validateConfig: {
       type: "mutation" as const,
-      input: z.object({ overrides: z.record(z.string(), z.unknown()) }),
+      input: z.object({ scope: ConfigScopeSchema, overrides: z.record(z.string(), z.unknown()) }),
       result: z.discriminatedUnion("ok", [z.object({ ok: z.literal(true) }), z.object({ ok: z.literal(false), issues: z.array(ConfigIssueSchema) })]),
     },
-    // `overrides` is the FULL desired override set (idempotent PUT semantics, not a patch).
+    // `overrides` is the FULL desired override set for `scope` (idempotent PUT semantics, not a patch).
     applyConfig: {
       type: "mutation" as const,
-      input: z.object({ overrides: z.record(z.string(), z.unknown()) }),
+      input: z.object({ scope: ConfigScopeSchema, overrides: z.record(z.string(), z.unknown()) }),
       result: ApplyResultSchema,
     },
     resetConfig: {
       type: "mutation" as const,
-      input: z.object({ path: z.array(z.string()) }),
+      input: z.object({ scope: ConfigScopeSchema, path: z.array(z.string()) }),
       result: ApplyResultSchema,
     },
   },

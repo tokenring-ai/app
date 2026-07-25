@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { AppConfigurationState } from "../state/AppConfigurationState.ts";
-import TokenRingApp from "../TokenRingApp";
+import type TokenRingApp from "../TokenRingApp";
 import type { TokenRingService } from "../types";
 import createTestingApp from "./createTestingApp.test";
 

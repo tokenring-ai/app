@@ -3,10 +3,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import { generateHumanId } from "@tokenring-ai/utility/string/generateHumanId";
-import type { z } from "zod";
-import { AppConfigurationState } from "./state/AppConfigurationState.ts";
 import StateManager from "./StateManager.ts";
 import type { AppSessionCheckpoint, TokenRingAppConfig } from "./schema.ts";
+import { AppConfigurationState, type ConfigLayer } from "./state/AppConfigurationState.ts";
 import { AppLogsState } from "./state/AppLogsState.ts";
 import type { AppStateSlice, TokenRingService } from "./types.ts";
 
@@ -30,10 +29,14 @@ export default class TokenRingApp {
   private shutdownStartedAt?: number | undefined;
   public readonly appConfig: TokenRingAppConfig["app"];
 
-  constructor(config: TokenRingAppConfig) {
+  constructor(config: TokenRingAppConfig, overrideLayers: { userConfig?: ConfigLayer | undefined; projectConfig?: ConfigLayer | undefined } = {}) {
     this.appConfig = config.app;
     this.stateManager.initializeState(AppLogsState, {});
-    this.stateManager.initializeState(AppConfigurationState, config);
+    this.stateManager.initializeState(AppConfigurationState, {
+      appConfig: config,
+      userConfig: overrideLayers.userConfig,
+      projectConfig: overrideLayers.projectConfig,
+    });
   }
 
   /**
@@ -186,7 +189,6 @@ export default class TokenRingApp {
       position = endPosition;
     }
   }
-
 
   /**
    * Returns a formatted status string describing what is still

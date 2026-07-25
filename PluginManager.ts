@@ -1,9 +1,6 @@
-import deepClone from "@tokenring-ai/utility/object/deepClone";
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
-import type { MaybePromise } from "bun";
 import { deepEquals } from "bun";
-import type { TokenRingAppConfig } from "./schema.ts";
-import { AppConfigurationState } from "./state/AppConfigurationState.ts";
+import { AppConfigurationState, type ConfigLayer } from "./state/AppConfigurationState.ts";
 import type TokenRingApp from "./TokenRingApp";
 import type { TokenRingPlugin, TokenRingService } from "./types";
 
@@ -13,51 +10,42 @@ export default class PluginManager implements TokenRingService {
 
   private plugins = new KeyedRegistry<TokenRingPlugin<any>>();
 
+  /** Bumped whenever the installed plugin set changes, so caches can be invalidated. */
+  private _generation = 0;
+
+  /** Last config slice handed to each plugin, keyed by plugin name, for change detection. */
+  private appliedConfigs = new Map<string, unknown>();
+
   getPlugins = this.plugins.valuesArray;
 
   constructor(private readonly app: TokenRingApp) {
     this.app.addServices(this);
   }
 
+  get generation(): number {
+    return this._generation;
+  }
+
   async run(signal: AbortSignal) {
-    let lastConfig = this.app.stateManager.getState(AppConfigurationState).config;
-
-    for await (const state of this.app.stateManager.subscribeAsync(AppConfigurationState, signal)) {
-      const newConfig = state.config;
-      let restartRequired = false;
-
-      const plugins = this.plugins.valuesArray();
-      for (const plugin of plugins) {
-        const hasConfig = "configSchema" in plugin;
-        if (hasConfig) {
-          const prevConfigSlice = plugin.configSchema.parse(lastConfig) as unknown;
-          const newConfigSlice = plugin.configSchema.parse(newConfig) as unknown;
-
-          if (!deepEquals(prevConfigSlice, newConfigSlice, true)) {
-            await plugin.reconfigure?.(this.app, newConfigSlice);
-          }
-        }
-      }
-
-      state.requiresRestartToFullyApplyConfig = restartRequired;
+    for await (const _state of this.app.stateManager.subscribeAsync(AppConfigurationState, signal)) {
+      await this.reconfigurePlugins();
     }
   }
 
   async installPlugins(plugins: TokenRingPlugin<any>[]): Promise<void> {
-    let config = this.app.stateManager.getState(AppConfigurationState).config;
+    const pluginConfigs: Record<string, ConfigLayer> = {};
     for (const plugin of plugins) {
       if ("config" in plugin) {
-        config = deepClone(config, plugin.config);
+        pluginConfigs[plugin.name] = plugin.config;
       }
     }
-
-    AppConfigurationState.replaceConfig(config, this.app)
+    AppConfigurationState.setPluginConfigs(this.app, pluginConfigs);
 
     for (const plugin of plugins) {
       try {
         if (plugin.earlyInstall) {
           this.app.serviceOutput(this, `Early Installing plugin "${plugin.name}"`);
-          await plugin.earlyInstall(this.app, "configSchema" in plugin ? plugin.configSchema.parse(config) : {});
+          await plugin.earlyInstall(this.app, this.configFor(plugin));
         }
       } catch (error: unknown) {
         this.app.serviceError(this, `Error early installing plugin "${plugin.name}":`, error);
@@ -69,9 +57,10 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.install) {
           this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-          await plugin.install(this.app, "configSchema" in plugin ? plugin.configSchema.parse(config) : {});
+          await plugin.install(this.app, this.configFor(plugin));
         }
         this.plugins.set(plugin.name, plugin);
+        this._generation++;
       } catch (error: unknown) {
         this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
         throw error;
@@ -82,12 +71,59 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.start) {
           this.app.serviceOutput(this, `Starting plugin "${plugin.name}"`);
-          await plugin.start(this.app, "configSchema" in plugin ? plugin.configSchema.parse(config) : {});
+          await plugin.start(this.app, this.configFor(plugin));
         }
       } catch (error: unknown) {
         this.app.serviceError(this, `Error starting plugin "${plugin.name}":`, error);
         throw error;
       }
     }
+  }
+
+  /**
+   * Hands the current merged configuration to every installed plugin whose
+   * config slice changed since it last received one. Plugins that cannot be
+   * reconfigured while running flag the app as needing a restart.
+   */
+  async reconfigurePlugins(): Promise<void> {
+    const { mergedConfig } = this.app.stateManager.getState(AppConfigurationState);
+    let restartRequired = false;
+
+    for (const plugin of this.plugins.valuesArray()) {
+      if (!("configSchema" in plugin)) continue;
+
+      const newConfigSlice = plugin.configSchema.parse(mergedConfig) as unknown;
+      if (deepEquals(this.appliedConfigs.get(plugin.name), newConfigSlice, true)) continue;
+
+      const config = this.configFor(plugin);
+      if (plugin.reconfigure) {
+        this.app.serviceOutput(this, `Reconfiguring plugin "${plugin.name}"`);
+        await plugin.reconfigure(this.app, config);
+      } else {
+        this.app.serviceOutput(this, `Plugin "${plugin.name}" does not support live reconfiguration`);
+        restartRequired = true;
+      }
+    }
+
+    // Sticky, and only mutated on transition so subscribers aren't re-notified.
+    if (restartRequired && !this.app.stateManager.getState(AppConfigurationState).requiresRestartToFullyApplyConfig) {
+      this.app.stateManager.mutateState(AppConfigurationState, state => {
+        state.requiresRestartToFullyApplyConfig = true;
+      });
+    }
+  }
+
+  /**
+   * Parses the plugin's slice out of the merged config, as two independent
+   * copies: one is returned for the plugin — which is free to mutate it, as
+   * plugins filling in defaults from the environment do — and one is kept
+   * private as the change-detection snapshot.
+   */
+  private configFor(plugin: TokenRingPlugin<any>): unknown {
+    if (!("configSchema" in plugin)) return {};
+
+    const { mergedConfig } = this.app.stateManager.getState(AppConfigurationState);
+    this.appliedConfigs.set(plugin.name, plugin.configSchema.parse(mergedConfig) as unknown);
+    return plugin.configSchema.parse(mergedConfig);
   }
 }

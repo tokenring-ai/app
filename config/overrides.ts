@@ -23,6 +23,14 @@ export function redactSensitiveValues(node: ConfigUINode, value: unknown): unkno
         return { __sensitive: true, isSet: value !== null && value !== "" } satisfies RedactedSensitiveValue;
       }
       return value;
+    case "secret":
+      // Only a literal credential is redacted; env and vault references are
+      // pointers the client needs in order to edit them, and non-sensitive
+      // sourced values (hosts, endpoints) are shown as-is.
+      if (node.sensitive && typeof value === "string") {
+        return { __sensitive: true, isSet: value !== "" } satisfies RedactedSensitiveValue;
+      }
+      return value;
     case "group": {
       if (!isPlainObject(value)) return value;
       const out: Record<string, unknown> = {};

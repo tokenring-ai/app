@@ -1,6 +1,6 @@
 import type { TokenRingPlugin } from "../types.ts";
 import { type ConfigFieldMeta, humanizeKey } from "./metadata.ts";
-import type { ConfigFieldNode, ConfigFieldSpec, ConfigOpaqueNode, ConfigUINode, ConfigUIPluginSchema } from "./uiSchema.ts";
+import type { ConfigFieldNode, ConfigFieldSpec, ConfigOpaqueNode, ConfigSecretNode, ConfigUINode, ConfigUIPluginSchema } from "./uiSchema.ts";
 
 /**
  * Introspects a plugin's zod config schema into a serializable ConfigUINode
@@ -204,6 +204,20 @@ function fieldNode(base: NodeBase, spec: ConfigFieldSpec, unwrapped: Unwrapped):
   });
 }
 
+function secretNode(base: NodeBase, unwrapped: Unwrapped): ConfigSecretNode {
+  const { meta, required, defaultValue } = unwrapped;
+  return stripUndefined({
+    kind: "secret" as const,
+    ...base,
+    required,
+    sensitive: meta.sensitive,
+    defaultValue,
+    restartRequired: meta.restartRequired,
+    advanced: meta.advanced,
+    placeholder: meta.placeholder,
+  });
+}
+
 function opaqueNode(base: NodeBase, reason: string, meta: ConfigFieldMeta = {}): ConfigOpaqueNode {
   return stripUndefined({
     kind: "opaque" as const,
@@ -253,6 +267,9 @@ function walkNode(schema: unknown, key: string, path: string[]): WalkResult | nu
 
 function walkDef(def: ZodDef, base: NodeBase, unwrapped: Unwrapped): ConfigUINode {
   const { meta } = unwrapped;
+
+  // Secret references carry their own control regardless of the union shape.
+  if (meta.secret) return secretNode(base, unwrapped);
 
   // An explicit uiType on a structured node (object/array/record) collapses it
   // into a single field — the escape hatch for "just edit this as JSON".

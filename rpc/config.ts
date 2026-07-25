@@ -8,21 +8,21 @@ export default createRPCEndpoint(ConfigRpcSchema, {
     const configurationService = app.requireService(ConfigurationService);
     return {
       plugins: configurationService.getUISchemas(),
-      overridesFile: configurationService.overridesFile,
+      overridesFiles: configurationService.overridesFiles,
       overlayError: configurationService.overlayError ?? null,
     };
   },
   getConfigValues(_args, app: TokenRingApp) {
     return app.requireService(ConfigurationService).getRedactedValues();
   },
-  validateConfig({ overrides }, app: TokenRingApp) {
-    const result = app.requireService(ConfigurationService).validateOverrides(overrides);
+  validateConfig({ scope, overrides }, app: TokenRingApp) {
+    const result = app.requireService(ConfigurationService).validateOverrides(scope, overrides);
     return result.ok ? { ok: true } : { ok: false, issues: result.issues };
   },
-  async applyConfig({ overrides }, app: TokenRingApp) {
-    return await app.requireService(ConfigurationService).apply(overrides);
+  async applyConfig({ scope, overrides }, app: TokenRingApp) {
+    return await app.requireService(ConfigurationService).apply(scope, overrides);
   },
-  async resetConfig({ path }, app: TokenRingApp) {
-    return await app.requireService(ConfigurationService).resetPath(path);
+  async resetConfig({ scope, path }, app: TokenRingApp) {
+    return await app.requireService(ConfigurationService).resetPath(scope, path);
   },
 });
