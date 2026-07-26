@@ -1,3 +1,4 @@
+import EnhancedMap from "@tokenring-ai/utility/map/enhancedMap";
 import type { z } from "zod";
 
 export abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> {
@@ -20,8 +21,8 @@ export interface StateStorageInterface<SpecificStateSliceType extends Serializab
 }
 
 export default class StateManager<SpecificStateSliceType extends SerializableStateSlice<any>> implements StateStorageInterface<SpecificStateSliceType> {
-  state = new Map<new (...args: any[]) => SpecificStateSliceType, SpecificStateSliceType>();
-  private subscribers = new Map<new (...args: any[]) => SpecificStateSliceType, Set<(state: any) => void>>();
+  state = new EnhancedMap<new (...args: any[]) => SpecificStateSliceType, SpecificStateSliceType>();
+  private subscribers = new EnhancedMap<new (...args: any[]) => SpecificStateSliceType, Set<(state: any) => void>>();
 
   constructor(private startingState: Record<string, unknown> = {}) {}
 
@@ -61,7 +62,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
   }
 
   serialize(): Record<string, object> {
-    return Object.fromEntries(Array.from(this.state.values()).map(slice => [slice.name, slice.serialize()]));
+    return Object.fromEntries(this.state.mapValues(slice => [slice.name, slice.serialize()]));
   }
 
   deserialize(data: Record<string, unknown>, onMissing?: (key: string) => void): void {
