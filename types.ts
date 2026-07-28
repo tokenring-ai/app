@@ -1,34 +1,26 @@
 import type Agent from "@tokenring-ai/agent/Agent";
 import type { AgentCreationContext } from "@tokenring-ai/agent/types";
 import type { MaybePromise } from "bun";
-import type { z } from "zod";
+import type { ZodNever, ZodType, z } from "zod";
 import { SerializableStateSlice } from "./StateManager.ts";
 import type TokenRingApp from "./TokenRingApp.ts";
 
-export type TokenRingPlugin<ConfigType = void> = ConfigType extends void
-  ? {
-      readonly name: string;
-      readonly displayName: string;
-      readonly version: string;
-      readonly description: string;
-      earlyInstall?: (app: TokenRingApp) => MaybePromise<void>;
-      install?: (app: TokenRingApp) => MaybePromise<void | undefined>;
-      start?: (app: TokenRingApp) => MaybePromise<void>;
-    }
-  : {
-      readonly name: string;
-      readonly displayName: string;
-      readonly version: string;
-      readonly description: string;
-      readonly config?: Record<string, unknown>;
-      readonly configSchema: ConfigType;
-      earlyInstall?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
-      install?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void | undefined>;
-      start?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
-      reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
-    };
+export type TokenRingPlugin<ConfigType extends ZodType = ZodNever, ImmutableConfigType extends ZodType = ZodNever> = {
+  readonly name: string;
+  readonly displayName: string;
+  readonly version: string;
+  readonly description: string;
+  readonly config?: Record<string, unknown>;
+  readonly configSchema?: ConfigType;
+  readonly immutableConfigSchema?: ImmutableConfigType;
+  earlyInstall?: (app: TokenRingApp, config: ImmutableConfigType extends ZodNever ? undefined : z.output<ImmutableConfigType>) => MaybePromise<void>;
+  install?: (app: TokenRingApp) => MaybePromise<void | undefined>;
+  start?: (app: TokenRingApp) => MaybePromise<void>;
+  /** Present when the plugin declares a `configSchema`. */
+  reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;
+};
 
-export type TokenRingPluginOrBuilder = TokenRingPlugin<any> | ((app: TokenRingApp) => MaybePromise<TokenRingPlugin<any>>);
+export type TokenRingPluginOrBuilder = TokenRingPlugin<any, any> | ((app: TokenRingApp) => MaybePromise<TokenRingPlugin<any, any>>);
 
 export interface TokenRingService {
   readonly name: string;

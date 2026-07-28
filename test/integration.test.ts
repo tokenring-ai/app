@@ -32,7 +32,7 @@ describe("App Integration Tests", () => {
       const installCalls: string[] = [];
       const startCalls: string[] = [];
 
-      class TestPlugin implements TokenRingPlugin<undefined> {
+      class TestPlugin implements TokenRingPlugin {
         readonly name = "IntegrationTestPlugin";
         readonly displayName = "IntegrationTestPlugin";
         version = "1.0.0";
@@ -61,7 +61,7 @@ describe("App Integration Tests", () => {
       app = createTestingApp();
       pluginManager = new PluginManager(app);
 
-      class Plugin1 implements TokenRingPlugin<undefined> {
+      class Plugin1 implements TokenRingPlugin {
         readonly name = "Plugin1";
         readonly displayName = "Plugin1";
         version = "1.0.0";
@@ -71,7 +71,7 @@ describe("App Integration Tests", () => {
         };
       }
 
-      class Plugin2 implements TokenRingPlugin<undefined> {
+      class Plugin2 implements TokenRingPlugin {
         readonly name = "Plugin2";
         readonly displayName = "Plugin2";
         version = "1.0.0";
@@ -81,7 +81,7 @@ describe("App Integration Tests", () => {
         };
       }
 
-      class Plugin3 implements TokenRingPlugin<undefined> {
+      class Plugin3 implements TokenRingPlugin {
         readonly name = "Plugin3";
         readonly displayName = "Plugin3";
         version = "1.0.0";
@@ -214,7 +214,7 @@ describe("App Integration Tests", () => {
       const service1 = new Service1();
       const service2 = new Service2();
 
-      class WorkflowPlugin implements TokenRingPlugin<undefined> {
+      class WorkflowPlugin implements TokenRingPlugin {
         readonly name = "WorkflowPlugin";
         readonly displayName = "WorkflowPlugin";
         version = "1.0.0";
@@ -377,7 +377,7 @@ describe("App Integration Tests", () => {
       // Plugin manager should work with configured app
       const pluginManagerWithConfig = new PluginManager(appWithConfig);
 
-      class ConfigTestPlugin implements TokenRingPlugin<undefined> {
+      class ConfigTestPlugin implements TokenRingPlugin {
         readonly name = "ConfigTestPlugin";
         readonly displayName = "ConfigTestPlugin";
         version = "1.0.0";
@@ -418,7 +418,7 @@ describe("App Integration Tests", () => {
     });
 
     it("should handle plugin installation errors without breaking app", async () => {
-      class FailingPlugin implements TokenRingPlugin<undefined> {
+      class FailingPlugin implements TokenRingPlugin {
         readonly name = "FailingPlugin";
         readonly displayName = "FailingPlugin";
         version = "1.0.0";
@@ -428,7 +428,7 @@ describe("App Integration Tests", () => {
         };
       }
 
-      class WorkingPlugin implements TokenRingPlugin<undefined> {
+      class WorkingPlugin implements TokenRingPlugin {
         readonly name = "WorkingPlugin";
         readonly displayName = "WorkingPlugin";
         version = "1.0.0";
@@ -458,7 +458,7 @@ describe("App Integration Tests", () => {
       app = createTestingApp();
       pluginManager = new PluginManager(app);
 
-      class ConcurrentPlugin1 implements TokenRingPlugin<undefined> {
+      class ConcurrentPlugin1 implements TokenRingPlugin {
         readonly name = "ConcurrentPlugin1";
         readonly displayName = "ConcurrentPlugin1";
         version = "1.0.0";
@@ -468,7 +468,7 @@ describe("App Integration Tests", () => {
         };
       }
 
-      class ConcurrentPlugin2 implements TokenRingPlugin<undefined> {
+      class ConcurrentPlugin2 implements TokenRingPlugin {
         readonly name = "ConcurrentPlugin2";
         readonly displayName = "ConcurrentPlugin2";
         version = "1.0.0";
@@ -478,7 +478,7 @@ describe("App Integration Tests", () => {
         };
       }
 
-      class ConcurrentPlugin3 implements TokenRingPlugin<undefined> {
+      class ConcurrentPlugin3 implements TokenRingPlugin {
         readonly name = "ConcurrentPlugin3";
         readonly displayName = "ConcurrentPlugin3";
         version = "1.0.0";

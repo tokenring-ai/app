@@ -397,11 +397,11 @@ function buildVariantNode(def: ZodDef, base: NodeBase): ConfigUINode | null {
  * top-level config key the plugin owns. Returns null for plugins without
  * config.
  */
-export default function buildConfigUISchema(plugin: TokenRingPlugin<any>): ConfigUIPluginSchema | null {
-  if (!("configSchema" in plugin)) return null;
-
+export default function buildConfigUISchema(plugin: TokenRingPlugin<any, any>): ConfigUIPluginSchema | null {
   // oxlint-disable typescript/no-unsafe-assignment
-  const configSchema = plugin.configSchema;
+  const configSchema = plugin.configSchema ?? plugin.immutableConfigSchema;
+  if (!configSchema) return null;
+
   const shape = (configSchema.shape ?? defOf(configSchema).shape) as Record<string, unknown> | undefined;
   if (!shape) return null;
 

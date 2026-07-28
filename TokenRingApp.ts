@@ -29,11 +29,14 @@ export default class TokenRingApp {
   private shutdownStartedAt?: number | undefined;
   public readonly appConfig: TokenRingAppConfig["app"];
 
-  constructor(config: TokenRingAppConfig, overrideLayers: { userConfig?: ConfigLayer | undefined; projectConfig?: ConfigLayer | undefined } = {}) {
-    this.appConfig = config.app;
+  constructor(
+    public readonly initialConfig: TokenRingAppConfig,
+    overrideLayers: { userConfig?: ConfigLayer | undefined; projectConfig?: ConfigLayer | undefined } = {},
+  ) {
+    this.appConfig = initialConfig.app;
     this.stateManager.initializeState(AppLogsState, {});
     this.stateManager.initializeState(AppConfigurationState, {
-      appConfig: config,
+      appConfig: initialConfig,
       userConfig: overrideLayers.userConfig,
       projectConfig: overrideLayers.projectConfig,
     });

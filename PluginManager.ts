@@ -8,19 +8,17 @@ export default class PluginManager implements TokenRingService {
   readonly name = "PluginManager";
   description = "Manages plugins";
 
-  private plugins = new KeyedRegistry<TokenRingPlugin<any>>();
-
-  /** Bumped whenever the installed plugin set changes, so caches can be invalidated. */
-  private _generation = 0;
-
+  private plugins = new KeyedRegistry<TokenRingPlugin<any, any>>();
+  getPlugins = this.plugins.valuesArray;
   /** Last config slice handed to each plugin, keyed by plugin name, for change detection. */
   private appliedConfigs = new Map<string, unknown>();
-
-  getPlugins = this.plugins.valuesArray;
 
   constructor(private readonly app: TokenRingApp) {
     this.app.addServices(this);
   }
+
+  /** Bumped whenever the installed plugin set changes, so caches can be invalidated. */
+  private _generation = 0;
 
   get generation(): number {
     return this._generation;
@@ -32,7 +30,7 @@ export default class PluginManager implements TokenRingService {
     }
   }
 
-  async installPlugins(plugins: TokenRingPlugin<any>[]): Promise<void> {
+  async installPlugins(plugins: TokenRingPlugin<any, any>[]): Promise<void> {
     const pluginConfigs: Record<string, ConfigLayer> = {};
     for (const plugin of plugins) {
       if ("config" in plugin) {
@@ -45,7 +43,7 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.earlyInstall) {
           this.app.serviceOutput(this, `Early Installing plugin "${plugin.name}"`);
-          await plugin.earlyInstall(this.app, this.configFor(plugin));
+          await plugin.earlyInstall(this.app, plugin.immutableConfigSchema?.parse(this.app.initialConfig));
         }
       } catch (error: unknown) {
         this.app.serviceError(this, `Error early installing plugin "${plugin.name}":`, error);
@@ -57,7 +55,21 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.install) {
           this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-          await plugin.install(this.app, this.configFor(plugin));
+          await plugin.install(this.app);
+        }
+        this.plugins.set(plugin.name, plugin);
+        this._generation++;
+      } catch (error: unknown) {
+        this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
+        throw error;
+      }
+    }
+
+    for (const plugin of plugins) {
+      try {
+        if (plugin.reconfigure) {
+          this.app.serviceOutput(this, `Configuring plugin "${plugin.name}"`);
+          await plugin.reconfigure(this.app, this.configFor(plugin));
         }
         this.plugins.set(plugin.name, plugin);
         this._generation++;
@@ -71,7 +83,7 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.start) {
           this.app.serviceOutput(this, `Starting plugin "${plugin.name}"`);
-          await plugin.start(this.app, this.configFor(plugin));
+          await plugin.start(this.app);
         }
       } catch (error: unknown) {
         this.app.serviceError(this, `Error starting plugin "${plugin.name}":`, error);
@@ -119,7 +131,7 @@ export default class PluginManager implements TokenRingService {
    * plugins filling in defaults from the environment do — and one is kept
    * private as the change-detection snapshot.
    */
-  private configFor(plugin: TokenRingPlugin<any>): unknown {
+  private configFor(plugin: TokenRingPlugin<any, any>): unknown {
     if (!("configSchema" in plugin)) return {};
 
     const { mergedConfig } = this.app.stateManager.getState(AppConfigurationState);
