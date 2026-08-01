@@ -26,7 +26,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
   constructor(private startingState: Record<string, unknown> = {}) {}
 
-  initializeState<S, T extends SpecificStateSliceType>(ClassType: new (props: S) => T, props: S): T {
+  initializeState<S, T extends SpecificStateSliceType>(ClassType: new (props: S) => T, props: S): Readonly<T> {
     const slice = new ClassType(props);
     this.state.set(ClassType, slice);
 
@@ -37,7 +37,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     return slice;
   }
 
-  mutateState<R, T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: T) => R): R {
+  mutateState<R, T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: T) => R): Readonly<R> {
     const state = this.state.get(ClassType) as T | undefined;
     if (!state) {
       throw new Error(`State slice ${ClassType.name} not found`);
@@ -49,7 +49,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     return result;
   }
 
-  getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): T {
+  getState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T): Readonly<T> {
     const stateSlice = this.state.get(ClassType);
     if (!stateSlice) {
       throw new Error(`State slice ${ClassType.name} not found`);
@@ -76,11 +76,11 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     }
   }
 
-  slices(): IterableIterator<SpecificStateSliceType> {
+  slices(): IterableIterator<Readonly<SpecificStateSliceType>> {
     return this.state.values();
   }
 
-  subscribe<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: T) => void): () => void {
+  subscribe<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, callback: (state: Readonly<T>) => void): () => void {
     if (!this.subscribers.has(ClassType)) {
       this.subscribers.set(ClassType, new Set());
     }
@@ -97,9 +97,9 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
 
   async timedWaitForState<T extends SpecificStateSliceType>(
     ClassType: new (...args: any[]) => T,
-    predicate: (state: T) => boolean,
+    predicate: (state: Readonly<T>) => boolean,
     timeoutMs: number,
-  ): Promise<T> {
+  ): Promise<Readonly<T>> {
     const state = this.getState(ClassType);
     if (predicate(state)) {
       return state;
@@ -121,7 +121,7 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     });
   }
 
-  waitForState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, predicate: (state: T) => boolean): Promise<T> {
+  waitForState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, predicate: (state: Readonly<T>) => boolean): Promise<Readonly<T>> {
     return new Promise(resolve => {
       const unsubscribe = this.subscribe(ClassType, state => {
         if (predicate(state)) {
@@ -132,14 +132,14 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     });
   }
 
-  async *subscribeAsync<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, signal: AbortSignal): AsyncGenerator<T, void, unknown> {
+  async *subscribeAsync<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, signal: AbortSignal): AsyncGenerator<Readonly<T>, void, unknown> {
     // Check if already aborted
     if (signal.aborted) {
       return;
     }
 
     // Create a queue to buffer state updates
-    let latestItem: T | null = this.getState(ClassType);
+    let latestItem: Readonly<T> | null = this.getState(ClassType);
     let resolveNext: (() => void) | null = null;
     let isComplete = false;
 

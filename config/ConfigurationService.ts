@@ -188,7 +188,7 @@ export default class ConfigurationService implements TokenRingService {
     return this.configSchema.parse(this.configState.getLayersBelow(scope));
   }
 
-  private get configState(): AppConfigurationState {
+  private get configState() {
     return this.app.getState(AppConfigurationState);
   }
 
