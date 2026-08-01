@@ -13,9 +13,7 @@ export default class PluginManager implements TokenRingService {
   /** Last config slice handed to each plugin, keyed by plugin name, for change detection. */
   private appliedConfigs = new Map<string, unknown>();
 
-  constructor(private readonly app: TokenRingApp) {
-    this.app.addService(this);
-  }
+  constructor(private readonly app: TokenRingApp) {}
 
   /** Bumped whenever the installed plugin set changes, so caches can be invalidated. */
   private _generation = 0;
