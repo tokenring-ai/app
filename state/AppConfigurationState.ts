@@ -142,7 +142,7 @@ export class AppConfigurationState extends AppStateSlice<typeof serializationSch
   }
 
   private static updateLayers(app: TokenRingApp, mutator: (state: AppConfigurationState) => void): void {
-    app.stateManager.mutateState(AppConfigurationState, state => {
+    app.mutateState(AppConfigurationState, state => {
       mutator(state);
       state.recomputeMergedConfig();
     });

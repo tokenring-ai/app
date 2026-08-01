@@ -189,7 +189,7 @@ export default class ConfigurationService implements TokenRingService {
   }
 
   private get configState(): AppConfigurationState {
-    return this.app.stateManager.getState(AppConfigurationState);
+    return this.app.getState(AppConfigurationState);
   }
 
   private checkAllowedKeys(candidateOverrides: ConfigLayer): ConfigValidationIssue[] {

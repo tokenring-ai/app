@@ -70,7 +70,7 @@ describe("ConfigurationService", () => {
       overridesFiles: { user: overridesFile, project: projectOverridesFile },
       overlayError,
     });
-    app.addServices(service);
+    app.addService(service);
     pluginManager = new PluginManager(app);
 
     reconfigureSpy = mock(() => {});
@@ -123,7 +123,7 @@ describe("ConfigurationService", () => {
       expect(fs.readFileSync(overridesFile, "utf8")).toStartWith("# TokenRing user configuration overrides.");
       expect(fs.existsSync(`${overridesFile}.tmp`)).toBe(false);
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
+      const fullConfig = app.getState(AppConfigurationState).mergedConfig;
 
       expect((fullConfig as any).testPlugin.size).toBe(7);
       expect(reconfigureSpy).toHaveBeenCalledTimes(1);
@@ -133,7 +133,7 @@ describe("ConfigurationService", () => {
     it("writes to the user layer only, leaving the layers around it alone", async () => {
       await service.apply("user", { testPlugin: { size: 7 } });
 
-      const state = app.stateManager.getState(AppConfigurationState);
+      const state = app.getState(AppConfigurationState);
       expect(state.userConfig).toEqual({ testPlugin: { size: 7 } });
       expect((state.appConfig as any).testPlugin.size).toBe(5);
       expect(state.projectConfig).toEqual({});
@@ -148,7 +148,7 @@ describe("ConfigurationService", () => {
 
       expect(fs.existsSync(overridesFile)).toBe(false);
       expect(service.getOverrides("user")).toEqual({});
-      expect((app.stateManager.getState(AppConfigurationState).mergedConfig as any).testPlugin.size).toBe(5);
+      expect((app.getState(AppConfigurationState).mergedConfig as any).testPlugin.size).toBe(5);
     });
 
     it("prunes values equal to the effective base config", async () => {
@@ -163,7 +163,7 @@ describe("ConfigurationService", () => {
       await service.apply("user", { testPlugin: { size: 10 } });
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 10 } });
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
+      const fullConfig = app.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin.size).toBe(10);
     });
 
@@ -180,7 +180,7 @@ describe("ConfigurationService", () => {
 
       expect(fs.existsSync(overridesFile)).toBe(false);
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
+      const fullConfig = app.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin.size).toBe(5);
       expect(reconfigureSpy).not.toHaveBeenCalled();
     });
@@ -247,7 +247,7 @@ describe("ConfigurationService", () => {
       expect(readProjectOverridesFile()).toEqual({ testPlugin: { size: 8 } });
       expect(fs.readFileSync(projectOverridesFile, "utf8")).toStartWith("# TokenRing project configuration overrides.");
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
+      const fullConfig = app.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin).toMatchObject({ size: 8, name: "from-user" });
     });
 
@@ -257,7 +257,7 @@ describe("ConfigurationService", () => {
 
       expect(readProjectOverridesFile()).toBeNull();
       expect(service.getOverrides("project")).toEqual({});
-      expect((app.stateManager.getState(AppConfigurationState).mergedConfig as any).testPlugin.size).toBe(7);
+      expect((app.getState(AppConfigurationState).mergedConfig as any).testPlugin.size).toBe(7);
     });
 
     it("reports the overrides of every scope separately", async () => {
@@ -307,7 +307,7 @@ describe("ConfigurationService", () => {
       await service.resetPath("user", ["testPlugin", "size"]);
       expect(readOverridesFile()).toEqual({ testPlugin: { name: "custom" } });
 
-      const fullConfig = app.stateManager.getState(AppConfigurationState).mergedConfig;
+      const fullConfig = app.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin.size).toBe(5);
 
       await service.resetPath("user", ["testPlugin", "name"]);

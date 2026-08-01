@@ -11,6 +11,7 @@ export const CONFIG_UI_TYPES = [
   "text",
   "multilineText",
   "password",
+  "regex",
   "number",
   "slider",
   "checkbox",
@@ -42,6 +43,11 @@ export const ConfigFieldSpecSchema = z.discriminatedUnion("type", [
     maxLength: z.number().optional(),
   }),
   z.object({ type: z.literal("password") }),
+  z.object({
+    type: z.literal("regex"),
+    minLength: z.number().optional(),
+    maxLength: z.number().optional(),
+  }),
   z.object({
     type: z.literal("number"),
     min: z.number().optional(),

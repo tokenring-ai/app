@@ -13,7 +13,11 @@ export interface ConfigFieldMeta {
   label?: string;
   /** Help text rendered under the field. */
   description?: string;
-  /** Override the auto-derived control type. */
+  /**
+   * Override the auto-derived control type.
+   * Use `"regex"` for strings that store a regular-expression pattern
+   * (validated in the UI; stored without surrounding slashes).
+   */
   uiType?: ConfigUIType;
   /** Options for a select control (default: derived from the enum/literal values). */
   options?: { label: string; value: string }[];

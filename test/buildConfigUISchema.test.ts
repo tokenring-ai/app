@@ -166,6 +166,7 @@ describe("walkConfigSchema meta overlay", () => {
   it("overrides the control via uiType, carrying constraints", () => {
     expect(walkField(z.string().min(2).meta({ uiType: "multilineText" })).field).toEqual({ type: "multilineText", minLength: 2 });
     expect(walkField(z.number().min(0).max(1).meta({ uiType: "slider" })).field).toEqual({ type: "slider", min: 0, max: 1 });
+    expect(walkField(z.string().meta({ uiType: "regex" })).field).toEqual({ type: "regex" });
   });
 
   it("treats sensitive text fields as password inputs", () => {

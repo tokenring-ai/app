@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import { generateHumanId } from "@tokenring-ai/utility/string/generateHumanId";
+import DebugService from "./debug/DebugService.ts";
 import StateManager from "./StateManager.ts";
 import type { AppSessionCheckpoint, TokenRingAppConfig } from "./schema.ts";
 import { AppConfigurationState, type ConfigLayer } from "./state/AppConfigurationState.ts";
@@ -18,11 +19,20 @@ export type LogEntry = {
 export default class TokenRingApp {
   readonly sessionId = generateHumanId();
   readonly stateManager = new StateManager<AppStateSlice<any>>();
+  initializeState = this.stateManager.initializeState.bind(this.stateManager);
+  mutateState = this.stateManager.mutateState.bind(this.stateManager);
+  getState = this.stateManager.getState.bind(this.stateManager);
+  waitForState = this.stateManager.waitForState.bind(this.stateManager);
+  subscribeStateAsync = this.stateManager.subscribeAsync.bind(this.stateManager);
+  timedWaitForState = this.stateManager.timedWaitForState.bind(this.stateManager);
+
   readonly runningServices = new Set<TokenRingService>();
   readonly stoppingServices = new Set<TokenRingService>();
   readonly backgroundTasks = new Map<string, number>();
   services = new TypedRegistry<TokenRingService>();
   requireService = this.services.requireItemByType;
+  addService = this.services.addOne;
+  addServices = this.services.addMany;
   getService = this.services.getItemByType;
   getServices = this.services.getItems;
   private readonly abortController = new AbortController();
@@ -40,6 +50,13 @@ export default class TokenRingApp {
       userConfig: overrideLayers.userConfig,
       projectConfig: overrideLayers.projectConfig,
     });
+    // Core introspection service, always available so the debugging UI works
+    // regardless of which plugins are installed.
+    this.addService(new DebugService(this));
+  }
+
+  get dataDirectory() {
+    return this.appConfig.dataDirectory;
   }
 
   /**
@@ -51,10 +68,6 @@ export default class TokenRingApp {
 
   get isShuttingDown(): boolean {
     return this.abortController.signal.aborted;
-  }
-
-  addServices(...services: TokenRingService[]) {
-    this.services.register(...services);
   }
 
   restoreState(state: AppSessionCheckpoint["state"]) {

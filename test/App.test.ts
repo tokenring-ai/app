@@ -23,7 +23,7 @@ describe("TokenRingApp", () => {
         description: "A mock service",
       };
 
-      app.addServices(mockService);
+      app.addService(mockService);
 
       // Verify service was added
       expect(app.getServices()).toContain(mockService);
@@ -150,7 +150,7 @@ describe("TokenRingApp", () => {
       spyOn(mockService1, "run");
       spyOn(mockService2, "run");
 
-      app.addServices(mockService1, mockService2);
+      app.addServices([mockService1, mockService2]);
 
       await Promise.all([app.run(), delay(100).then(() => app.shutdown())]);
 
@@ -175,7 +175,7 @@ describe("TokenRingApp", () => {
         }
       }
 
-      app.addServices(new MockService());
+      app.addService(new MockService());
 
       const runPromise = app.run();
       await delay(20);
@@ -201,7 +201,7 @@ describe("TokenRingApp", () => {
         }
       }
 
-      app.addServices(new MockService());
+      app.addService(new MockService());
 
       expect(app.run()).rejects.toThrow("Start failed");
       expect(stop).toHaveBeenCalledTimes(1);

@@ -44,7 +44,7 @@ describe("Config RPC", () => {
       widget: { size: 5 },
     };
     app = new TokenRingApp(composedSchema.parse(base));
-    app.addServices(
+    app.addService(
       new ConfigurationService(app, {
         configSchema: composedSchema,
         overridesFiles: { user: overridesFile, project: projectOverridesFile },

@@ -1376,7 +1376,7 @@ The application provides comprehensive error handling:
 
 ### Service Registration
 
-Services are registered with the application using the `addServices` method:
+Services are registered with the application using the `addService` method:
 
 ```typescript
 import { TokenRingService } from "@tokenring-ai/app";

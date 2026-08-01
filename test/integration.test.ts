@@ -230,7 +230,7 @@ describe("App Integration Tests", () => {
       const plugin = new WorkflowPlugin();
 
       // Add services
-      app.addServices(service1, service2);
+      app.addServices([service1, service2]);
 
       // Install plugin
       await pluginManager.installPlugins([plugin]);
@@ -275,7 +275,7 @@ describe("App Integration Tests", () => {
       const serviceA = new ServiceA();
       const serviceB = new ServiceB();
 
-      app.addServices(serviceA, serviceB);
+      app.addServices([serviceA, serviceB]);
 
       const runPromise = app.run();
 
@@ -411,7 +411,7 @@ describe("App Integration Tests", () => {
       const errorService = new Service1();
 
       spyOn(errorService, "run");
-      app.addServices(errorService);
+      app.addService(errorService);
       await Promise.all([app.run(), delay(100).then(() => app.shutdown())]);
 
       expect(errorService.run).toHaveBeenCalled();
@@ -511,7 +511,7 @@ describe("App Integration Tests", () => {
         description = "Service 2";
       }
 
-      app.addServices(new Service1(), new Service2());
+      app.addServices([new Service1(), new Service2()]);
 
       let callbackCalled = false;
       app.waitForService(Service2, service => {

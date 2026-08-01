@@ -153,6 +153,7 @@ function applyUiTypeOverride(spec: ConfigFieldSpec, meta: ConfigFieldMeta): Conf
   switch (uiType) {
     case "text":
     case "multilineText":
+    case "regex":
       return stripUndefined({ type: uiType, ...lengths });
     case "password":
       return { type: "password" };

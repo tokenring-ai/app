@@ -14,7 +14,7 @@ export default class PluginManager implements TokenRingService {
   private appliedConfigs = new Map<string, unknown>();
 
   constructor(private readonly app: TokenRingApp) {
-    this.app.addServices(this);
+    this.app.addService(this);
   }
 
   /** Bumped whenever the installed plugin set changes, so caches can be invalidated. */
@@ -25,7 +25,7 @@ export default class PluginManager implements TokenRingService {
   }
 
   async run(signal: AbortSignal) {
-    for await (const _state of this.app.stateManager.subscribeAsync(AppConfigurationState, signal)) {
+    for await (const _state of this.app.subscribeStateAsync(AppConfigurationState, signal)) {
       await this.reconfigurePlugins();
     }
   }
@@ -98,7 +98,7 @@ export default class PluginManager implements TokenRingService {
    * reconfigured while running flag the app as needing a restart.
    */
   async reconfigurePlugins(): Promise<void> {
-    const { mergedConfig } = this.app.stateManager.getState(AppConfigurationState);
+    const { mergedConfig } = this.app.getState(AppConfigurationState);
     let restartRequired = false;
 
     for (const plugin of this.plugins.valuesArray()) {
@@ -118,8 +118,8 @@ export default class PluginManager implements TokenRingService {
     }
 
     // Sticky, and only mutated on transition so subscribers aren't re-notified.
-    if (restartRequired && !this.app.stateManager.getState(AppConfigurationState).requiresRestartToFullyApplyConfig) {
-      this.app.stateManager.mutateState(AppConfigurationState, state => {
+    if (restartRequired && !this.app.getState(AppConfigurationState).requiresRestartToFullyApplyConfig) {
+      this.app.mutateState(AppConfigurationState, state => {
         state.requiresRestartToFullyApplyConfig = true;
       });
     }
@@ -134,7 +134,7 @@ export default class PluginManager implements TokenRingService {
   private configFor(plugin: TokenRingPlugin<any, any>): unknown {
     if (!("configSchema" in plugin)) return {};
 
-    const { mergedConfig } = this.app.stateManager.getState(AppConfigurationState);
+    const { mergedConfig } = this.app.getState(AppConfigurationState);
     this.appliedConfigs.set(plugin.name, plugin.configSchema.parse(mergedConfig) as unknown);
     return plugin.configSchema.parse(mergedConfig);
   }

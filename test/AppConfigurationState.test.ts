@@ -17,7 +17,7 @@ const appLayer = () =>
 
 describe("AppConfigurationState", () => {
   let app: TokenRingApp;
-  const state = () => app.stateManager.getState(AppConfigurationState);
+  const state = () => app.getState(AppConfigurationState);
 
   beforeEach(() => {
     app = new TokenRingApp(appLayer(), {
