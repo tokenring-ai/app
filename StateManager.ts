@@ -132,7 +132,10 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     });
   }
 
-  async *subscribeAsync<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, signal: AbortSignal): AsyncGenerator<Readonly<T>, void, unknown> {
+  async *subscribeAsync<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+    signal: AbortSignal,
+  ): AsyncGenerator<Readonly<T>, void, unknown> {
     // Check if already aborted
     if (signal.aborted) {
       return;
