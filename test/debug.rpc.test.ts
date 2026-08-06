@@ -8,7 +8,7 @@ import TokenRingApp from "../TokenRingApp.ts";
 
 type StatusResult = { status: string };
 
-let dataDirectory: string;
+let workspaceDirectory: string;
 let app: TokenRingApp;
 
 /** Calls a non-streaming method on the app RPC endpoint. */
@@ -18,10 +18,11 @@ function call<T>(method: string, args: unknown): Promise<T> {
 }
 
 beforeEach(async () => {
-  dataDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "tokenring-debug-rpc-"));
+  workspaceDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "tokenring-debug-rpc-"));
   app = new TokenRingApp({
     app: {
-      dataDirectory,
+      workingDirectory: workspaceDirectory,
+      workspaceDirectory,
       configDirectories: [],
       shutdownMonitorIntervalMs: 2000,
       serviceRestartDelayMs: 5000,
@@ -36,7 +37,7 @@ afterEach(async () => {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
   app.shutdown("test finished");
-  await fs.rm(dataDirectory, { recursive: true, force: true });
+  await fs.rm(workspaceDirectory, { recursive: true, force: true });
 });
 
 describe("debug RPC", () => {

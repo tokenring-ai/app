@@ -9,14 +9,15 @@ import { DebugState } from "../state/DebugState.ts";
 import TokenRingApp from "../TokenRingApp.ts";
 import { AppStateSlice } from "../types.ts";
 
-let dataDirectory: string;
+let workspaceDirectory: string;
 let app: TokenRingApp;
 let debugService: DebugService;
 
 function createApp(directory: string): TokenRingApp {
   return new TokenRingApp({
     app: {
-      dataDirectory: directory,
+      workingDirectory: directory,
+      workspaceDirectory: directory,
       configDirectories: [],
       shutdownMonitorIntervalMs: 2000,
       serviceRestartDelayMs: 5000,
@@ -26,12 +27,12 @@ function createApp(directory: string): TokenRingApp {
 }
 
 async function readDebugDirectory(): Promise<string[]> {
-  return (await fs.readdir(path.join(dataDirectory, "debug"))).sort();
+  return (await fs.readdir(path.join(workspaceDirectory, "debug"))).sort();
 }
 
 beforeEach(async () => {
-  dataDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "tokenring-debug-"));
-  app = createApp(dataDirectory);
+  workspaceDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "tokenring-debug-"));
+  app = createApp(workspaceDirectory);
   debugService = app.requireService(DebugService);
 });
 
@@ -42,7 +43,7 @@ afterEach(async () => {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
   app.shutdown("test finished");
-  await fs.rm(dataDirectory, { recursive: true, force: true });
+  await fs.rm(workspaceDirectory, { recursive: true, force: true });
 });
 
 describe("snapshot names", () => {
@@ -66,7 +67,7 @@ describe("snapshot names", () => {
 describe("DebugService", () => {
   it("is registered on every app", () => {
     expect(debugService).toBeInstanceOf(DebugService);
-    expect(debugService.getDebugDirectory()).toBe(path.join(dataDirectory, "debug"));
+    expect(debugService.getDebugDirectory()).toBe(path.join(workspaceDirectory, "debug"));
   });
 
   it("always offers the app as a capture target", () => {
@@ -80,13 +81,13 @@ describe("DebugService", () => {
     ]);
   });
 
-  it("captures app state as pretty-printed JSON under dataDirectory/debug", async () => {
+  it("captures app state as pretty-printed JSON under workspaceDirectory/debug", async () => {
     const name = await debugService.capture({ kind: "app", id: "app" });
 
     expect(name).toMatch(/^app-state-\d{8}T\d{2}:\d{2}:\d{2}\.json$/);
     expect(await readDebugDirectory()).toEqual([name!]);
 
-    const raw = await fs.readFile(path.join(dataDirectory, "debug", name!), "utf8");
+    const raw = await fs.readFile(path.join(workspaceDirectory, "debug", name!), "utf8");
     expect(raw).toBe(JSON.stringify(JSON.parse(raw), null, 2));
 
     const snapshot = JSON.parse(raw);
@@ -117,7 +118,7 @@ describe("DebugService", () => {
     app.initializeState(BrokenState, {});
 
     const name = await debugService.capture({ kind: "app", id: "app" });
-    const snapshot = JSON.parse(await fs.readFile(path.join(dataDirectory, "debug", name!), "utf8"));
+    const snapshot = JSON.parse(await fs.readFile(path.join(workspaceDirectory, "debug", name!), "utf8"));
 
     expect(snapshot.data.state.BrokenState.__serializationError).toContain("cannot serialize");
     expect(snapshot.data.state.AppLogsState).toBeDefined();
@@ -143,7 +144,7 @@ describe("DebugService", () => {
       const name = await debugService.capture({ kind: "agent", id: "abc123" });
 
       expect(name).toMatch(/^agent-abc123-\d{8}T\d{2}:\d{2}:\d{2}\.json$/);
-      const snapshot = JSON.parse(await fs.readFile(path.join(dataDirectory, "debug", name!), "utf8"));
+      const snapshot = JSON.parse(await fs.readFile(path.join(workspaceDirectory, "debug", name!), "utf8"));
       expect(snapshot.data).toEqual({ agentId: "abc123", greeting: "hello" });
     });
 

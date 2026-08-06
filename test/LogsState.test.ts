@@ -9,7 +9,8 @@ describe("TokenRingApp Logs State", () => {
   it("should store logs in state manager", () => {
     const app = new TokenRingApp({
       app: {
-        dataDirectory: "/tmp",
+        workingDirectory: "/tmp",
+        workspaceDirectory: "/tmp",
         configDirectories: [],
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
@@ -29,7 +30,8 @@ describe("TokenRingApp Logs State", () => {
   it("should persist logs in checkpoint", () => {
     const app = new TokenRingApp({
       app: {
-        dataDirectory: "/tmp",
+        workingDirectory: "/tmp",
+        workspaceDirectory: "/tmp",
         configDirectories: [],
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
@@ -56,7 +58,8 @@ describe("TokenRingApp Logs State", () => {
   it("should restore logs from checkpoint", () => {
     const app1 = new TokenRingApp({
       app: {
-        dataDirectory: "/tmp",
+        workingDirectory: "/tmp",
+        workspaceDirectory: "/tmp",
         configDirectories: [],
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
@@ -71,7 +74,8 @@ describe("TokenRingApp Logs State", () => {
     // Create second app and restore state
     const app2 = new TokenRingApp({
       app: {
-        dataDirectory: "/tmp",
+        workingDirectory: "/tmp",
+        workspaceDirectory: "/tmp",
         configDirectories: [],
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
@@ -89,7 +93,8 @@ describe("TokenRingApp Logs State", () => {
   it("should not skip logs appended while a subscriber processes an entry", async () => {
     const app = new TokenRingApp({
       app: {
-        dataDirectory: "/tmp",
+        workingDirectory: "/tmp",
+        workspaceDirectory: "/tmp",
         configDirectories: [],
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,

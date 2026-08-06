@@ -3,7 +3,8 @@ import TokenRingApp from "../TokenRingApp";
 export default function createTestingApp() {
   return new TokenRingApp({
     app: {
-      dataDirectory: "/tmp",
+      workingDirectory: "/tmp",
+      workspaceDirectory: "/tmp",
       configDirectories: [],
       shutdownMonitorIntervalMs: 2000,
       serviceRestartDelayMs: 5000,

@@ -27,7 +27,7 @@ describe("buildTokenRingAppConfigLayers", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "trlayers-"));
     configDir = path.join(tempDir, "configs");
     dataDir = path.join(tempDir, "data");
-    overridesFile = path.join(tempDir, "user", "config.yaml");
+    overridesFile = path.join(tempDir, "global", "config.yaml");
     projectOverridesFile = path.join(tempDir, "project.config.yaml");
     fs.mkdirSync(configDir, { recursive: true });
   });
@@ -38,7 +38,8 @@ describe("buildTokenRingAppConfigLayers", () => {
 
   const defaultConfig = () => ({
     app: {
-      dataDirectory: dataDir,
+      workingDirectory: dataDir,
+      workspaceDirectory: dataDir,
       configDirectories: [configDir],
       printLogs: false,
     },
@@ -51,13 +52,13 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.writeFileSync(projectOverridesFile, "feature:\n  x: 3\n");
 
     const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), {
-      userOverridesFile: overridesFile,
-      projectOverridesFile,
+      globalConfigFile: overridesFile,
+      workspaceConfigFile: projectOverridesFile,
     });
 
     expect(layers.appConfig.feature).toEqual({ x: 2, y: "fromDir" });
-    expect(layers.userConfig).toEqual({ feature: { y: "fromUser" } });
-    expect(layers.projectConfig).toEqual({ feature: { x: 3 } });
+    expect(layers.globalConfig).toEqual({ feature: { y: "fromUser" } });
+    expect(layers.workspaceConfig).toEqual({ feature: { x: 3 } });
     expect(layers.overlayError).toBeUndefined();
   });
 
@@ -68,18 +69,18 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.writeFileSync(projectOverridesFile, "feature:\n  x: 3\n");
 
     const config = await buildTokenRingAppConfig(composedSchema, defaultConfig(), {
-      userOverridesFile: overridesFile,
-      projectOverridesFile,
+      globalConfigFile: overridesFile,
+      workspaceConfigFile: projectOverridesFile,
     });
 
     expect(config.feature).toEqual({ x: 3, y: "fromUser" });
   });
 
   it("is a no-op when the overrides file is missing", async () => {
-    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
+    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { globalConfigFile: overridesFile });
     expect(layers.appConfig.feature).toEqual({ x: 1, y: "default" });
-    expect(layers.userConfig).toEqual({});
-    expect(layers.projectConfig).toEqual({});
+    expect(layers.globalConfig).toEqual({});
+    expect(layers.workspaceConfig).toEqual({});
     expect(layers.overlayError).toBeUndefined();
   });
 
@@ -87,9 +88,9 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.mkdirSync(path.dirname(overridesFile), { recursive: true });
     fs.writeFileSync(overridesFile, "feature: [unclosed\n");
 
-    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
+    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { globalConfigFile: overridesFile });
     expect(layers.appConfig.feature).toEqual({ x: 1, y: "default" });
-    expect(layers.userConfig).toEqual({});
+    expect(layers.globalConfig).toEqual({});
     expect(layers.overlayError).toContain(overridesFile);
   });
 
@@ -98,9 +99,9 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.mkdirSync(path.dirname(overridesFile), { recursive: true });
     fs.writeFileSync(overridesFile, "feature:\n  x: notanumber\n");
 
-    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
+    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { globalConfigFile: overridesFile });
     expect(layers.appConfig.feature.x).toBe(2);
-    expect(layers.userConfig).toEqual({});
+    expect(layers.globalConfig).toEqual({});
     expect(layers.overlayError).toContain(overridesFile);
   });
 
@@ -108,8 +109,8 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.mkdirSync(path.dirname(overridesFile), { recursive: true });
     fs.writeFileSync(overridesFile, "- a\n- b\n");
 
-    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { userOverridesFile: overridesFile });
-    expect(layers.userConfig).toEqual({});
+    const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), { globalConfigFile: overridesFile });
+    expect(layers.globalConfig).toEqual({});
     expect(layers.overlayError).toContain("mapping");
   });
 
@@ -119,12 +120,12 @@ describe("buildTokenRingAppConfigLayers", () => {
     fs.writeFileSync(projectOverridesFile, "feature:\n  x: notanumber\n");
 
     const layers = await buildTokenRingAppConfigLayers(composedSchema, defaultConfig(), {
-      userOverridesFile: overridesFile,
-      projectOverridesFile,
+      globalConfigFile: overridesFile,
+      workspaceConfigFile: projectOverridesFile,
     });
 
-    expect(layers.userConfig).toEqual({ feature: { y: "fromUser" } });
-    expect(layers.projectConfig).toEqual({});
+    expect(layers.globalConfig).toEqual({ feature: { y: "fromUser" } });
+    expect(layers.workspaceConfig).toEqual({});
     expect(layers.overlayError).toContain(projectOverridesFile);
   });
 });

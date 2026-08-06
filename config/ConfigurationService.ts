@@ -27,10 +27,10 @@ export interface ConfigurationServiceOptions {
 }
 
 const OVERRIDES_HEADERS: Record<ConfigScope, string> = {
-  user: `# TokenRing user configuration overrides.
+  global: `# TokenRing global configuration overrides.
 # Managed by the TokenRing configuration UI; hand edits are preserved per-key.`,
-  project: `# TokenRing project configuration overrides. These take precedence over
-# the user configuration.
+  workspace: `# TokenRing workspace configuration overrides. These take precedence over
+# the global configuration.
 # Managed by the TokenRing configuration UI; hand edits are preserved per-key.`,
 };
 
@@ -43,7 +43,7 @@ const OVERRIDES_HEADERS: Record<ConfigScope, string> = {
  */
 export default class ConfigurationService implements TokenRingService {
   readonly name = "ConfigurationService";
-  readonly description = "Manages user and project configuration overrides and live plugin reconfiguration";
+  readonly description = "Manages configuration overrides and live plugin reconfiguration";
 
   readonly overlayError: string | undefined;
   readonly overridesFiles: Record<ConfigScope, string>;

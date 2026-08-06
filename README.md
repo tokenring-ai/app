@@ -700,7 +700,7 @@ const AppSessionCheckpointSchema = z.object({
   sessionId: z.string(),
   createdAt: z.number(),
   hostname: z.string(),
-  projectDirectory: z.string(),
+  workspaceDirectory: z.string(),
   state: z.record(z.string(), z.unknown()),
 });
 
@@ -712,7 +712,7 @@ type AppSessionCheckpoint = z.input<typeof AppSessionCheckpointSchema>;
 | `sessionId` | Unique session ID |
 | `createdAt` | Timestamp when checkpoint was created |
 | `hostname` | Hostname of the machine |
-| `projectDirectory` | Working directory path |
+| `workspaceDirectory` | Working directory path |
 | `state` | Serialized state |
 
 ### StateStorageInterface
@@ -1201,7 +1201,7 @@ const checkpoint = {
   sessionId: app.sessionId,
   createdAt: Date.now(),
   hostname: "localhost",
-  projectDirectory: "/path/to/project",
+  workspaceDirectory: "/path/to/project",
   state: state,
 };
 await fs.writeFile("checkpoint.json", JSON.stringify(checkpoint));
@@ -1413,7 +1413,7 @@ const checkpoint = {
   sessionId: app.sessionId,
   createdAt: Date.now(),
   hostname: "localhost",
-  projectDirectory: "/path/to/project",
+  workspaceDirectory: "/path/to/project",
   state: state,
 };
 await fs.writeFile("checkpoint.json", JSON.stringify(checkpoint));

@@ -15,7 +15,7 @@ describe("App Integration Tests", () => {
     mock.clearAllMocks();
 
     app = createTestingApp();
-    pluginManager = new PluginManager(app);
+    pluginManager = app.addService(new PluginManager(app));
   });
 
   afterEach(() => {
@@ -59,7 +59,7 @@ describe("App Integration Tests", () => {
     it("should handle multiple plugins with different lifecycle requirements", async () => {
       // Create fresh pluginManager for this test
       app = createTestingApp();
-      pluginManager = new PluginManager(app);
+      pluginManager = app.addService(new PluginManager(app));
 
       class Plugin1 implements TokenRingPlugin {
         readonly name = "Plugin1";
@@ -197,7 +197,7 @@ describe("App Integration Tests", () => {
     it("should orchestrate full app lifecycle", async () => {
       // Create fresh app and pluginManager for this test
       app = createTestingApp();
-      pluginManager = new PluginManager(app);
+      pluginManager = app.addService(new PluginManager(app));
 
       class Service1 implements TokenRingService {
         readonly name = "Service1";
@@ -342,7 +342,8 @@ describe("App Integration Tests", () => {
     it("should handle configuration across components", () => {
       const config = {
         app: {
-          dataDirectory: "/tmp",
+          workingDirectory: "/tmp",
+          workspaceDirectory: "/tmp",
           configDirectories: [],
           shutdownMonitorIntervalMs: 2000,
           serviceRestartDelayMs: 5000,
@@ -354,7 +355,8 @@ describe("App Integration Tests", () => {
 
       const appWithConfig = new TokenRingApp(config);
       expect(appWithConfig.appConfig).toEqual({
-        dataDirectory: "/tmp",
+        workingDirectory: "/tmp",
+        workspaceDirectory: "/tmp",
         configDirectories: [],
         shutdownMonitorIntervalMs: 2000,
         serviceRestartDelayMs: 5000,
@@ -364,7 +366,8 @@ describe("App Integration Tests", () => {
       const fullConfig = appWithConfig.stateManager.getState(AppConfigurationState).mergedConfig;
       expect(fullConfig).toEqual({
         app: {
-          dataDirectory: "/tmp",
+          workingDirectory: "/tmp",
+          workspaceDirectory: "/tmp",
           configDirectories: [],
           shutdownMonitorIntervalMs: 2000,
           serviceRestartDelayMs: 5000,
@@ -375,7 +378,7 @@ describe("App Integration Tests", () => {
       });
 
       // Plugin manager should work with configured app
-      const pluginManagerWithConfig = new PluginManager(appWithConfig);
+      const pluginManagerWithConfig = appWithConfig.addService(new PluginManager(appWithConfig));
 
       class ConfigTestPlugin implements TokenRingPlugin {
         readonly name = "ConfigTestPlugin";
@@ -384,7 +387,8 @@ describe("App Integration Tests", () => {
         description = "Config test plugin";
         install = (app: TokenRingApp) => {
           expect(app.appConfig).toEqual({
-            dataDirectory: "/tmp",
+            workingDirectory: "/tmp",
+            workspaceDirectory: "/tmp",
             configDirectories: [],
             shutdownMonitorIntervalMs: 2000,
             serviceRestartDelayMs: 5000,
@@ -456,7 +460,7 @@ describe("App Integration Tests", () => {
     it("should handle concurrent operations", async () => {
       // Create fresh app and pluginManager for this test
       app = createTestingApp();
-      pluginManager = new PluginManager(app);
+      pluginManager = app.addService(new PluginManager(app));
 
       class ConcurrentPlugin1 implements TokenRingPlugin {
         readonly name = "ConcurrentPlugin1";

@@ -1,25 +1,26 @@
 import fs from "node:fs";
 import deepClone from "@tokenring-ai/utility/object/deepClone";
 import { isPlainObject } from "@tokenring-ai/utility/object/isPlainObject";
+import joinDefault from "@tokenring-ai/utility/string/joinDefault";
 import { file, Glob, YAML } from "bun";
 import type { z } from "zod";
 import type { TokenRingAppConfigSchema } from "./schema.ts";
 import type { ConfigLayer } from "./state/AppConfigurationState.ts";
 
 export interface BuildConfigOptions {
-  /** Sparse user override file, e.g. ~/.tokenring/config.yaml. */
-  userOverridesFile?: string;
-  /** Sparse project override file, e.g. <projectDirectory>/.tokenring/config.yaml. */
-  projectOverridesFile?: string;
+  /** Global config file, e.g. ~/.tokenring/config.yaml. */
+  globalConfigFile?: string;
+  /** Workspace config file, e.g. <workspaceDirectory>/config.yaml. */
+  workspaceConfigFile?: string;
 }
 
 export interface TokenRingAppConfigLayers<T extends z.ZodTypeAny> {
   /** CLI defaults ⊕ configDirectories YAML, parsed — the immutable app layer. */
   appConfig: z.output<T>;
   /** Sparse user overrides as loaded ({} when absent or rejected). */
-  userConfig: ConfigLayer;
+  globalConfig: ConfigLayer;
   /** Sparse project overrides as loaded ({} when absent or rejected). */
-  projectConfig: ConfigLayer;
+  workspaceConfig: ConfigLayer;
   /** Set when an override file exists but was rejected; that layer is then empty. */
   overlayError: string | undefined;
 }
@@ -35,10 +36,7 @@ export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
   defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>,
   options: BuildConfigOptions = {},
 ): Promise<TokenRingAppConfigLayers<T>> {
-  const { dataDirectory, configDirectories } = defaultConfig.app;
-  if (!fs.existsSync(dataDirectory)) {
-    fs.mkdirSync(dataDirectory);
-  }
+  const { configDirectories } = defaultConfig.app;
 
   const glob = new Glob("**/*.yaml");
 
@@ -68,7 +66,8 @@ export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
       const parsedYaml = YAML.parse(await file(overlayFile).text());
       if (parsedYaml == null) return {};
       if (!isPlainObject(parsedYaml)) {
-        throw new Error("Expected a YAML mapping at the top level");
+        overlayErrors.push(`Configuration overrides in ${overlayFile} were rejected and are not active: Expected a YAML mapping at the top level`);
+        return {};
       }
       configSchema.parse(deepClone(mergedConfig, ...overlays, parsedYaml));
       return parsedYaml as ConfigLayer;
@@ -78,15 +77,15 @@ export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
     }
   };
 
-  const userConfig = await loadOverlay(options.userOverridesFile);
-  overlays.push(userConfig);
-  const projectConfig = await loadOverlay(options.projectOverridesFile);
+  const globalConfig = await loadOverlay(options.globalConfigFile);
+  overlays.push(globalConfig);
+  const workspaceConfig = await loadOverlay(options.workspaceConfigFile);
 
   return {
     appConfig,
-    userConfig,
-    projectConfig,
-    overlayError: overlayErrors.length > 0 ? overlayErrors.join("\n") : undefined,
+    globalConfig,
+    workspaceConfig,
+    overlayError: joinDefault("\n", overlayErrors, undefined),
   };
 }
 
@@ -95,6 +94,6 @@ export default async function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
   defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>,
   options: BuildConfigOptions = {},
 ): Promise<z.output<T>> {
-  const { appConfig, userConfig, projectConfig } = await buildTokenRingAppConfigLayers(configSchema, defaultConfig, options);
-  return configSchema.parse(deepClone(appConfig as object, userConfig, projectConfig)) as z.output<T>;
+  const { appConfig, globalConfig, workspaceConfig } = await buildTokenRingAppConfigLayers(configSchema, defaultConfig, options);
+  return configSchema.parse(deepClone(appConfig as object, globalConfig, workspaceConfig)) as z.output<T>;
 }

@@ -1,3 +1,4 @@
+import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
@@ -41,22 +42,18 @@ export default class TokenRingApp {
 
   constructor(
     public readonly initialConfig: TokenRingAppConfig,
-    overrideLayers: { userConfig?: ConfigLayer | undefined; projectConfig?: ConfigLayer | undefined } = {},
+    overrideLayers: { globalConfig?: ConfigLayer | undefined; workspaceConfig?: ConfigLayer | undefined } = {},
   ) {
     this.appConfig = initialConfig.app;
     this.stateManager.initializeState(AppLogsState, {});
     this.stateManager.initializeState(AppConfigurationState, {
       appConfig: initialConfig,
-      userConfig: overrideLayers.userConfig,
-      projectConfig: overrideLayers.projectConfig,
+      globalConfig: overrideLayers.globalConfig,
+      workspaceConfig: overrideLayers.workspaceConfig,
     });
     // Core introspection service, always available so the debugging UI works
     // regardless of which plugins are installed.
     this.addService(new DebugService(this));
-  }
-
-  get dataDirectory() {
-    return this.appConfig.dataDirectory;
   }
 
   /**
@@ -279,5 +276,13 @@ export default class TokenRingApp {
     this.stateManager.mutateState(AppLogsState, state => {
       state.addLog(level, message);
     });
+  }
+
+  getWorkingDirectoryResolvedPath(pathToResolve: string) {
+    return path.resolve(this.appConfig.workingDirectory, pathToResolve);
+  }
+
+  getWorkspaceResolvedPath(pathToResolve: string) {
+    return path.resolve(this.appConfig.workspaceDirectory, pathToResolve);
   }
 }

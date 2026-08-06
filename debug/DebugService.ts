@@ -49,7 +49,7 @@ export const APP_TARGET: DebugTarget = {
 
 /**
  * Captures debugging snapshots of live app and agent state and writes them to
- * `<dataDirectory>/debug` as pretty-printed JSON.
+ * `<workspaceDirectory>/debug` as pretty-printed JSON.
  *
  * The app itself is always capturable; other subsystems register a
  * {@link DebugSnapshotSource} so their objects show up as targets too.
@@ -73,7 +73,7 @@ export default class DebugService implements TokenRingService {
 
   /** The directory snapshots are written to. Created lazily on first capture. */
   getDebugDirectory(): string {
-    return path.resolve(this.app.appConfig.dataDirectory, "debug");
+    return this.app.getWorkspaceResolvedPath("debug");
   }
 
   /** Everything that can be captured right now, app first. */

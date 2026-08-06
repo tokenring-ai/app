@@ -5,11 +5,11 @@
  * Kept dependency-free so the RPC schema and the web client can import it
  * without pulling in the app runtime.
  */
-export const configScopes = ["user", "project"] as const;
+export const configScopes = ["global", "workspace"] as const;
 
 export type ConfigScope = (typeof configScopes)[number];
 
 export const configScopeLabels: Record<ConfigScope, string> = {
-  user: "User",
-  project: "Project",
+  global: "Global",
+  workspace: "Workspace",
 };

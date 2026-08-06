@@ -11,7 +11,7 @@ const composedSchema = z.object({
 
 const appLayer = () =>
   composedSchema.parse({
-    app: { dataDirectory: "/tmp", configDirectories: [], printLogs: false },
+    app: { workingDirectory: "/tmp", workspaceDirectory: "/tmp", configDirectories: [], printLogs: false },
     feature: { x: 1, y: "fromApp", z: "fromApp" },
   });
 
@@ -21,8 +21,8 @@ describe("AppConfigurationState", () => {
 
   beforeEach(() => {
     app = new TokenRingApp(appLayer(), {
-      userConfig: { feature: { y: "fromUser", z: "fromUser" } },
-      projectConfig: { feature: { z: "fromProject" } },
+      globalConfig: { feature: { y: "fromUser", z: "fromUser" } },
+      workspaceConfig: { feature: { z: "fromProject" } },
     });
   });
 
@@ -60,26 +60,26 @@ describe("AppConfigurationState", () => {
   it("exposes the layers below each scope", () => {
     AppConfigurationState.setPluginConfig(app, "feature-plugin", { feature: { x: 2 } });
 
-    expect((state().getLayersBelow("user") as any).feature).toEqual({ x: 2, y: "fromApp", z: "fromApp" });
+    expect((state().getLayersBelow("global") as any).feature).toEqual({ x: 2, y: "fromApp", z: "fromApp" });
     // The project layer sits above the user layer, so the user layer is included.
-    expect((state().getLayersBelow("project") as any).feature).toEqual({ x: 2, y: "fromUser", z: "fromUser" });
+    expect((state().getLayersBelow("workspace") as any).feature).toEqual({ x: 2, y: "fromUser", z: "fromUser" });
   });
 
   it("previews a candidate layer for either scope without applying it", () => {
-    const userPreview = state().previewWithOverrideLayer("user", { feature: { y: "candidate" } });
+    const userPreview = state().previewWithOverrideLayer("global", { feature: { y: "candidate" } });
     expect((userPreview as any).feature).toEqual({ x: 1, y: "candidate", z: "fromProject" });
 
-    const projectPreview = state().previewWithOverrideLayer("project", { feature: { y: "candidate" } });
+    const projectPreview = state().previewWithOverrideLayer("workspace", { feature: { y: "candidate" } });
     expect((projectPreview as any).feature).toEqual({ x: 1, y: "candidate", z: "fromUser" });
 
     expect((state().mergedConfig as any).feature.y).toBe("fromUser");
   });
 
   it("reads and writes an override layer by scope", () => {
-    AppConfigurationState.setOverrideLayer(app, "project", { feature: { z: "changed" } });
+    AppConfigurationState.setOverrideLayer(app, "workspace", { feature: { z: "changed" } });
 
-    expect(state().getOverrideLayer("project")).toEqual({ feature: { z: "changed" } });
-    expect(state().getOverrideLayer("user")).toEqual({ feature: { y: "fromUser", z: "fromUser" } });
+    expect(state().getOverrideLayer("workspace")).toEqual({ feature: { z: "changed" } });
+    expect(state().getOverrideLayer("global")).toEqual({ feature: { y: "fromUser", z: "fromUser" } });
     expect((state().mergedConfig as any).feature.z).toBe("changed");
   });
 
@@ -89,8 +89,8 @@ describe("AppConfigurationState", () => {
     const checkpoint = app.generateStateCheckpoint();
     expect(checkpoint.AppConfigurationState).toEqual({
       pluginConfigs: { "feature-plugin": { feature: { x: 2 } } },
-      userConfig: { feature: { y: "fromUser", z: "fromUser" } },
-      projectConfig: { feature: { z: "fromProject" } },
+      globalConfig: { feature: { y: "fromUser", z: "fromUser" } },
+      workspaceConfig: { feature: { z: "fromProject" } },
     });
 
     const restored = new TokenRingApp(appLayer());

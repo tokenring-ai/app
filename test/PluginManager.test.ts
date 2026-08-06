@@ -15,7 +15,7 @@ describe("PluginManager", () => {
 
     // Create a real app instance for proper testing
     mockApp = createTestingApp();
-    pluginManager = new PluginManager(mockApp);
+    pluginManager = mockApp.addService(new PluginManager(mockApp));
   });
 
   afterEach(() => {
@@ -28,7 +28,7 @@ describe("PluginManager", () => {
       expect(pluginManager.description).toBe("Manages plugins");
     });
 
-    it("should register itself as a service", () => {
+    it("should register as a service when added to the app", () => {
       expect(mockApp.getServices()).toContain(pluginManager);
     });
 
@@ -42,7 +42,7 @@ describe("PluginManager", () => {
     beforeEach(() => {
       // Create fresh instances for each test
       mockApp = createTestingApp();
-      pluginManager = new PluginManager(mockApp);
+      pluginManager = mockApp.addService(new PluginManager(mockApp));
     });
 
     it("should install single plugin successfully", async () => {
@@ -60,8 +60,8 @@ describe("PluginManager", () => {
       await pluginManager.installPlugins([mockPlugin]);
 
       expect(pluginManager.getPlugins()).toContain(mockPlugin);
-      expect(mockPlugin.install).toHaveBeenCalledWith(mockApp, {});
-      expect(mockPlugin.start).toHaveBeenCalledWith(mockApp, {});
+      expect(mockPlugin.install).toHaveBeenCalledWith(mockApp);
+      expect(mockPlugin.start).toHaveBeenCalledWith(mockApp);
     });
 
     it("should install multiple plugins", async () => {
@@ -108,7 +108,7 @@ describe("PluginManager", () => {
       await pluginManager.installPlugins([plugin]);
 
       expect(pluginManager.getPlugins()).toContain(plugin);
-      expect(plugin.start).toHaveBeenCalledWith(mockApp, {});
+      expect(plugin.start).toHaveBeenCalledWith(mockApp);
     });
 
     it("should handle plugins without optional start method", async () => {
@@ -125,7 +125,7 @@ describe("PluginManager", () => {
       await pluginManager.installPlugins([plugin]);
 
       expect(pluginManager.getPlugins()).toContain(plugin);
-      expect(plugin.install).toHaveBeenCalledWith(mockApp, {});
+      expect(plugin.install).toHaveBeenCalledWith(mockApp);
     });
 
     it("should handle plugins with neither install nor start methods", async () => {
@@ -272,7 +272,7 @@ describe("PluginManager", () => {
   describe("Plugin Access", () => {
     beforeEach(() => {
       mockApp = createTestingApp();
-      pluginManager = new PluginManager(mockApp);
+      pluginManager = mockApp.addService(new PluginManager(mockApp));
     });
 
     it("should return empty array when no plugins installed", () => {
@@ -312,66 +312,75 @@ describe("PluginManager", () => {
         config: { widget: { size: 4 } },
         install: mock(),
         ...overrides,
-      }) as TokenRingPlugin<typeof widgetSchema> & { install: ReturnType<typeof mock> };
+      }) as TokenRingPlugin<typeof widgetSchema> & {
+        install: ReturnType<typeof mock>;
+        reconfigure?: ReturnType<typeof mock>;
+      };
 
     beforeEach(() => {
       mockApp = createTestingApp();
-      pluginManager = new PluginManager(mockApp);
+      pluginManager = mockApp.addService(new PluginManager(mockApp));
     });
 
     it("registers the plugin default config as its own layer", async () => {
-      const plugin = makePlugin();
+      const reconfigure = mock();
+      const plugin = makePlugin({ reconfigure });
       await pluginManager.installPlugins([plugin]);
 
       const state = mockApp.stateManager.getState(AppConfigurationState);
       expect(state.pluginConfigs).toEqual({ "widget-plugin": { widget: { size: 4 } } });
       expect((state.mergedConfig as any).widget).toEqual({ size: 4 });
-      expect(plugin.install).toHaveBeenCalledWith(mockApp, { widget: { size: 4, color: "red" } });
+      expect(plugin.install).toHaveBeenCalledWith(mockApp);
+      expect(reconfigure).toHaveBeenCalledWith(mockApp, { widget: { size: 4, color: "red" } });
     });
 
     it("lets the user layer override a plugin default", async () => {
       const appConfig = createTestingApp().stateManager.getState(AppConfigurationState).appConfig;
-      mockApp = new TokenRingApp(appConfig, { userConfig: { widget: { size: 9 } } });
-      pluginManager = new PluginManager(mockApp);
+      mockApp = new TokenRingApp(appConfig, { globalConfig: { widget: { size: 9 } } });
+      pluginManager = mockApp.addService(new PluginManager(mockApp));
 
-      const plugin = makePlugin();
+      const reconfigure = mock();
+      const plugin = makePlugin({ reconfigure });
       await pluginManager.installPlugins([plugin]);
 
-      expect(plugin.install).toHaveBeenCalledWith(mockApp, { widget: { size: 9, color: "red" } });
+      expect(plugin.install).toHaveBeenCalledWith(mockApp);
+      expect(reconfigure).toHaveBeenCalledWith(mockApp, { widget: { size: 9, color: "red" } });
     });
 
     it("reconfigures only the plugins whose config slice changed", async () => {
       const reconfigure = mock();
       const plugin = makePlugin({ reconfigure });
       await pluginManager.installPlugins([plugin]);
+      // installPlugins already hands config to reconfigure once.
+      expect(reconfigure).toHaveBeenCalledTimes(1);
 
-      // Nothing changed since install — no reconfiguration.
+      // Nothing changed since install — no further reconfiguration.
       await pluginManager.reconfigurePlugins();
-      expect(reconfigure).not.toHaveBeenCalled();
+      expect(reconfigure).toHaveBeenCalledTimes(1);
 
       AppConfigurationState.setUserConfig(mockApp, { widget: { color: "blue" } });
       await pluginManager.reconfigurePlugins();
       expect(reconfigure).toHaveBeenCalledWith(mockApp, { widget: { size: 4, color: "blue" } });
+      expect(reconfigure).toHaveBeenCalledTimes(2);
 
       // Re-running without a further change is a no-op.
       await pluginManager.reconfigurePlugins();
-      expect(reconfigure).toHaveBeenCalledTimes(1);
+      expect(reconfigure).toHaveBeenCalledTimes(2);
     });
 
     it("does not reconfigure a plugin that mutated the config it was handed", async () => {
-      const reconfigure = mock();
-      const plugin = makePlugin({
+      const reconfigure = mock().mockImplementation((_app, config: any) => {
         // Plugins fill in defaults from the environment this way.
-        install: mock().mockImplementation((_app, config: any) => {
-          config.widget.color = "fromEnv";
-        }),
-        reconfigure,
+        config.widget.color = "fromEnv";
       });
+      const plugin = makePlugin({ reconfigure });
 
       await pluginManager.installPlugins([plugin]);
-      await pluginManager.reconfigurePlugins();
+      expect(reconfigure).toHaveBeenCalledTimes(1);
 
-      expect(reconfigure).not.toHaveBeenCalled();
+      await pluginManager.reconfigurePlugins();
+      // Mutation of the handed copy must not pollute change detection.
+      expect(reconfigure).toHaveBeenCalledTimes(1);
       expect(mockApp.stateManager.getState(AppConfigurationState).requiresRestartToFullyApplyConfig).toBe(false);
     });
 
