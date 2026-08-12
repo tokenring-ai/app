@@ -207,7 +207,7 @@ describe("DebugService", () => {
       expect(state.recording).toBe(true);
       expect(state.intervalMs).toBe(5000);
 
-      await app.timedWaitForState(DebugState, current => current.captureCount > 0, 2000);
+      await app.timedWaitForState(DebugState, current => current.captureCount > 0, 2000, new AbortController().signal);
       expect(app.getState(DebugState).lastSnapshot).toMatch(/^app-state-/);
       expect(await debugService.listSnapshots()).toHaveLength(1);
     });
@@ -219,7 +219,7 @@ describe("DebugService", () => {
 
     it("stops recording", async () => {
       debugService.startRecording([{ kind: "app", id: "app" }], 5000);
-      await app.timedWaitForState(DebugState, current => current.captureCount > 0, 2000);
+      await app.timedWaitForState(DebugState, current => current.captureCount > 0, 2000, new AbortController().signal);
 
       debugService.stopRecording();
       expect(app.getState(DebugState).recording).toBe(false);
@@ -228,7 +228,7 @@ describe("DebugService", () => {
 
     it("records a failure when a recorded target disappears", async () => {
       debugService.startRecording([{ kind: "agent", id: "gone" }], 5000);
-      await app.timedWaitForState(DebugState, current => current.lastError !== null, 2000);
+      await app.timedWaitForState(DebugState, current => current.lastError !== null, 2000, new AbortController().signal);
 
       expect(app.getState(DebugState).lastError).toContain("agent/gone");
       expect(app.getState(DebugState).captureCount).toBe(0);

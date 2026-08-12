@@ -1,7 +1,7 @@
 import EnhancedMap from "@tokenring-ai/utility/map/enhancedMap";
 import type { z } from "zod";
 
-export abstract class SerializableStateSlice<SerializationSchema extends z.ZodTypeAny> {
+export abstract class SerializableStateSlice<SerializationSchema extends z.ZodType> {
   constructor(
     public readonly name: string,
     public readonly serializationSchema: SerializationSchema,
@@ -99,33 +99,75 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
     ClassType: new (...args: any[]) => T,
     predicate: (state: Readonly<T>) => boolean,
     timeoutMs: number,
+    signal: AbortSignal,
   ): Promise<Readonly<T>> {
     const state = this.getState(ClassType);
     if (predicate(state)) {
       return state;
     }
 
+    if (signal.aborted) {
+      throw signal.reason ?? new Error("Operation was aborted");
+    }
+
     return await new Promise((resolve, reject) => {
+      let cleanup = () => {};
+
       const timeout = setTimeout(() => {
-        unsubscribe();
+        cleanup();
         reject(new Error(`Timeout waiting for state ${ClassType.name}`));
       }, timeoutMs);
 
+      const abortHandler = () => {
+        cleanup();
+        reject(signal.reason ?? new Error("Operation was aborted"));
+      };
+
+      signal.addEventListener("abort", abortHandler);
+
       const unsubscribe = this.subscribe(ClassType, state => {
         if (predicate(state)) {
-          clearTimeout(timeout);
-          unsubscribe();
+          cleanup();
           resolve(state);
         }
       });
+
+      cleanup = () => {
+        clearTimeout(timeout);
+        unsubscribe();
+        signal.removeEventListener("abort", abortHandler);
+      };
     });
   }
 
-  waitForState<T extends SpecificStateSliceType>(ClassType: new (...args: any[]) => T, predicate: (state: Readonly<T>) => boolean): Promise<Readonly<T>> {
-    return new Promise(resolve => {
-      const unsubscribe = this.subscribe(ClassType, state => {
+  waitForState<T extends SpecificStateSliceType>(
+    ClassType: new (...args: any[]) => T,
+    predicate: (state: Readonly<T>) => boolean,
+    signal: AbortSignal,
+  ): Promise<Readonly<T>> {
+    const state = this.getState(ClassType);
+    if (predicate(state)) {
+      return Promise.resolve(state);
+    }
+
+    if (signal.aborted) {
+      return Promise.reject(signal.reason ?? new Error("Operation was aborted"));
+    }
+
+    return new Promise((resolve, reject) => {
+      let unsubscribe: () => void = () => {};
+
+      const abortHandler = () => {
+        unsubscribe();
+        reject(signal.reason ?? new Error("Operation was aborted"));
+      };
+
+      signal.addEventListener("abort", abortHandler);
+
+      unsubscribe = this.subscribe(ClassType, state => {
         if (predicate(state)) {
           unsubscribe();
+          signal.removeEventListener("abort", abortHandler);
           resolve(state);
         }
       });

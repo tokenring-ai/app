@@ -19,7 +19,7 @@ export type ConfigApplyResult = { ok: true } | { ok: false; issues: ConfigValida
 
 export interface ConfigurationServiceOptions {
   /** The composed app config schema (all plugin shapes merged). */
-  configSchema: z.ZodTypeAny;
+  configSchema: z.ZodType;
   /** File each override scope is persisted to. */
   overridesFiles: Record<ConfigScope, string>;
   /** Boot-time error when an overrides file was rejected, for the UI banner. */
@@ -48,7 +48,7 @@ export default class ConfigurationService implements TokenRingService {
   readonly overlayError: string | undefined;
   readonly overridesFiles: Record<ConfigScope, string>;
 
-  private readonly configSchema: z.ZodTypeAny;
+  private readonly configSchema: z.ZodType;
   private uiSchemaCache: { generation: number; uiSchemas: ConfigUIPluginSchema[] } | undefined;
   private applyQueue: Promise<unknown> = Promise.resolve();
 

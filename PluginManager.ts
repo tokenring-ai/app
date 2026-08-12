@@ -1,3 +1,4 @@
+import deepClone from "@tokenring-ai/utility/object/deepClone";
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import { deepEquals } from "bun";
 import { AppConfigurationState, type ConfigLayer } from "./state/AppConfigurationState.ts";
@@ -56,7 +57,6 @@ export default class PluginManager implements TokenRingService {
           await plugin.install(this.app);
         }
         this.plugins.set(plugin.name, plugin);
-        this._generation++;
       } catch (error: unknown) {
         this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
         throw error;
@@ -70,9 +70,8 @@ export default class PluginManager implements TokenRingService {
           await plugin.reconfigure(this.app, this.configFor(plugin));
         }
         this.plugins.set(plugin.name, plugin);
-        this._generation++;
       } catch (error: unknown) {
-        this.app.serviceError(this, `Error installing plugin "${plugin.name}":`, error);
+        this.app.serviceError(this, `Error configuring plugin "${plugin.name}":`, error);
         throw error;
       }
     }
@@ -88,6 +87,8 @@ export default class PluginManager implements TokenRingService {
         throw error;
       }
     }
+
+    this._generation++;
   }
 
   /**
@@ -133,7 +134,8 @@ export default class PluginManager implements TokenRingService {
     if (!("configSchema" in plugin)) return {};
 
     const { mergedConfig } = this.app.getState(AppConfigurationState);
-    this.appliedConfigs.set(plugin.name, plugin.configSchema.parse(mergedConfig) as unknown);
-    return plugin.configSchema.parse(mergedConfig);
+    const parsed = plugin.configSchema.parse(mergedConfig) as unknown;
+    this.appliedConfigs.set(plugin.name, deepClone(parsed));
+    return parsed;
   }
 }

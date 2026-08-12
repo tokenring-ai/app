@@ -14,7 +14,7 @@ export interface BuildConfigOptions {
   workspaceConfigFile?: string;
 }
 
-export interface TokenRingAppConfigLayers<T extends z.ZodTypeAny> {
+export interface TokenRingAppConfigLayers<T extends z.ZodType> {
   /** CLI defaults ⊕ configDirectories YAML, parsed — the immutable app layer. */
   appConfig: z.output<T>;
   /** Sparse user overrides as loaded ({} when absent or rejected). */
@@ -31,7 +31,7 @@ export interface TokenRingAppConfigLayers<T extends z.ZodTypeAny> {
  * override layers. A rejected override file never prevents boot — that layer is
  * dropped and the error is surfaced for the configuration UI.
  */
-export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
+export async function buildTokenRingAppConfigLayers<T extends z.ZodType>(
   configSchema: T,
   defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>,
   options: BuildConfigOptions = {},
@@ -89,7 +89,7 @@ export async function buildTokenRingAppConfigLayers<T extends z.ZodTypeAny>(
   };
 }
 
-export default async function buildTokenRingAppConfig<T extends z.ZodTypeAny>(
+export default async function buildTokenRingAppConfig<T extends z.ZodType>(
   configSchema: T,
   defaultConfig: z.input<T> & z.input<typeof TokenRingAppConfigSchema>,
   options: BuildConfigOptions = {},

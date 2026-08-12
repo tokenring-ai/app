@@ -295,17 +295,25 @@ describe("StateManager", () => {
     });
 
     it("should resolve immediately if predicate already true", async () => {
-      const result = await stateManager.waitForState(MockStateSlice, state => {
-        return state.data === "initial";
-      });
+      const result = await stateManager.waitForState(
+        MockStateSlice,
+        state => {
+          return state.data === "initial";
+        },
+        new AbortController().signal,
+      );
 
       expect(result.data).toBe("initial");
     });
 
     it("should wait for state change", async () => {
-      const waitPromise = stateManager.waitForState(MockStateSlice, state => {
-        return state.data === "changed";
-      });
+      const waitPromise = stateManager.waitForState(
+        MockStateSlice,
+        state => {
+          return state.data === "changed";
+        },
+        new AbortController().signal,
+      );
 
       // Change state after a short delay
       setTimeout(() => {
@@ -319,17 +327,19 @@ describe("StateManager", () => {
     });
 
     it("should handle timeout in timedWaitForState", async () => {
-      expect(stateManager.timedWaitForState(MockStateSlice, state => state.data === "never", 50)).rejects.toThrow("Timeout waiting for state MockStateSlice");
+      expect(stateManager.timedWaitForState(MockStateSlice, state => state.data === "never", 50, new AbortController().signal)).rejects.toThrow(
+        "Timeout waiting for state MockStateSlice",
+      );
     });
 
     it("should resolve with timeout if condition met", async () => {
-      const result = await stateManager.timedWaitForState(MockStateSlice, state => state.data === "initial", 100);
+      const result = await stateManager.timedWaitForState(MockStateSlice, state => state.data === "initial", 100, new AbortController().signal);
 
       expect(result.data).toBe("initial");
     });
 
     it("should handle timeout with state change", async () => {
-      const waitPromise = stateManager.timedWaitForState(MockStateSlice, state => state.data === "changed", 50);
+      const waitPromise = stateManager.timedWaitForState(MockStateSlice, state => state.data === "changed", 50, new AbortController().signal);
 
       setTimeout(() => {
         stateManager.mutateState(MockStateSlice, state => {

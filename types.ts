@@ -57,7 +57,7 @@ export class NotImplementedError extends Error {
   }
 }
 
-export abstract class AppStateSlice<SerializationSchema extends z.ZodTypeAny> extends SerializableStateSlice<SerializationSchema> {}
+export abstract class AppStateSlice<SerializationSchema extends z.ZodType> extends SerializableStateSlice<SerializationSchema> {}
 
 // The configuration UI field spec lives in config/uiSchema.ts; this alias is
 // kept for compatibility with earlier code that imported it from types.ts.
