@@ -14,7 +14,8 @@ export type TokenRingPlugin<ConfigType extends ZodType = ZodNever, ImmutableConf
   readonly configSchema?: ConfigType;
   readonly immutableConfigSchema?: ImmutableConfigType;
   earlyInstall?: (app: TokenRingApp, config: ImmutableConfigType extends ZodNever ? undefined : z.output<ImmutableConfigType>) => MaybePromise<void>;
-  install?: (app: TokenRingApp) => MaybePromise<void | undefined>;
+  /** Receives the same parsed immutable config as `earlyInstall`. */
+  install?: (app: TokenRingApp, config: ImmutableConfigType extends ZodNever ? undefined : z.output<ImmutableConfigType>) => MaybePromise<void | undefined>;
   start?: (app: TokenRingApp) => MaybePromise<void>;
   /** Present when the plugin declares a `configSchema`. */
   reconfigure?: (app: TokenRingApp, config: z.output<ConfigType>) => MaybePromise<void>;

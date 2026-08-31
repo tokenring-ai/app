@@ -45,12 +45,13 @@ describe("Config RPC", () => {
     };
     app = new TokenRingApp(composedSchema.parse(base));
     app.addService(
+      ConfigurationService,
       new ConfigurationService(app, {
         configSchema: composedSchema,
         overridesFiles: { global: overridesFile, workspace: projectOverridesFile },
       }),
     );
-    const pluginManager = app.addService(new PluginManager(app));
+    const pluginManager = app.addService(PluginManager, new PluginManager(app));
     const plugin = {
       name: "widget-plugin",
       displayName: "Widget Plugin",

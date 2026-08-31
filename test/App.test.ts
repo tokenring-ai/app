@@ -18,21 +18,21 @@ describe("TokenRingApp", () => {
 
   describe("Service Registry", () => {
     it("should add services to registry", () => {
-      const mockService = {
-        name: "MockService",
-        description: "A mock service",
-      };
+      class MockService {
+        name = "MockService";
+        description = "A mock service";
+      }
+      const mockService = new MockService();
 
-      app.addService(mockService);
+      app.addService(MockService, mockService);
 
-      // Verify service was added
-      expect(app.getServices()).toContain(mockService);
+      expect(app.getService(MockService)).toBe(mockService);
     });
 
     it("should provide service access methods", () => {
       expect(app.requireService).toBeDefined();
       expect(app.getService).toBeDefined();
-      expect(app.getServices).toBeDefined();
+      expect(app.getServiceEntries).toBeDefined();
     });
   });
 
@@ -112,7 +112,7 @@ describe("TokenRingApp", () => {
 
       const mockCallback = mock();
 
-      // Mock the services.waitForItemByType method
+      // Mock the waitForService method
       const mockWaitForItemByType = mock();
       Object.defineProperty(app, "services", {
         get: () => ({
@@ -150,7 +150,8 @@ describe("TokenRingApp", () => {
       spyOn(mockService1, "run");
       spyOn(mockService2, "run");
 
-      app.addServices([mockService1, mockService2]);
+      app.addService(MockService1, mockService1);
+      app.addService(MockService2, mockService2);
 
       await Promise.all([app.run(), delay(100).then(() => app.shutdown())]);
 
@@ -175,7 +176,7 @@ describe("TokenRingApp", () => {
         }
       }
 
-      app.addService(new MockService());
+      app.addService(MockService, new MockService());
 
       const runPromise = app.run();
       await delay(20);
@@ -201,7 +202,7 @@ describe("TokenRingApp", () => {
         }
       }
 
-      app.addService(new MockService());
+      app.addService(MockService, new MockService());
 
       expect(app.run()).rejects.toThrow("Start failed");
       expect(stop).toHaveBeenCalledTimes(1);

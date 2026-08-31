@@ -42,7 +42,7 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.earlyInstall) {
           this.app.serviceOutput(this, `Early Installing plugin "${plugin.name}"`);
-          await plugin.earlyInstall(this.app, plugin.immutableConfigSchema?.parse(this.app.initialConfig));
+          await plugin.earlyInstall(this.app, this.immutableConfigFor(plugin));
         }
       } catch (error: unknown) {
         this.app.serviceError(this, `Error early installing plugin "${plugin.name}":`, error);
@@ -54,7 +54,7 @@ export default class PluginManager implements TokenRingService {
       try {
         if (plugin.install) {
           this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-          await plugin.install(this.app);
+          await plugin.install(this.app, this.immutableConfigFor(plugin));
         }
         this.plugins.set(plugin.name, plugin);
       } catch (error: unknown) {
@@ -122,6 +122,11 @@ export default class PluginManager implements TokenRingService {
         state.requiresRestartToFullyApplyConfig = true;
       });
     }
+  }
+
+  /** Parses the plugin's boot-time slice from `app.initialConfig`, or `undefined` when none is declared. */
+  private immutableConfigFor(plugin: TokenRingPlugin<any, any>): unknown {
+    return plugin.immutableConfigSchema?.parse(this.app.initialConfig);
   }
 
   /**

@@ -41,14 +41,14 @@ afterEach(async () => {
 });
 
 describe("debug RPC", () => {
-  it("lists the app as a capture target", async () => {
+  it("lists application state as a capture target", async () => {
     const result = await call<{ targets: { kind: string; id: string }[] }>("listDebugTargets", {});
     expect(result.targets).toHaveLength(1);
-    expect(result.targets[0]).toMatchObject({ kind: "app", id: "app" });
+    expect(result.targets[0]).toMatchObject({ kind: "app", id: "state", label: "Application State" });
   });
 
   it("captures, lists, reads and deletes a snapshot", async () => {
-    const captured = await call<{ status: string; name: string }>("captureDebugSnapshot", { kind: "app", id: "app" });
+    const captured = await call<{ status: string; name: string }>("captureDebugSnapshot", { kind: "app", id: "state" });
     expect(captured.status).toBe("success");
 
     const listed = await call<{ snapshots: { name: string }[] }>("listDebugSnapshots", {});
@@ -56,7 +56,7 @@ describe("debug RPC", () => {
 
     const read = await call<{ status: string; content: string }>("readDebugSnapshot", { name: captured.name });
     expect(read.status).toBe("success");
-    expect(JSON.parse(read.content).target).toEqual({ kind: "app", id: "app" });
+    expect(JSON.parse(read.content).target).toEqual({ kind: "app", id: "state" });
 
     expect(await call<StatusResult>("deleteDebugSnapshot", { name: captured.name })).toEqual({ status: "success" });
     expect(await call<StatusResult>("deleteDebugSnapshot", { name: captured.name })).toEqual({ status: "notFound" });
@@ -69,10 +69,10 @@ describe("debug RPC", () => {
 
   it("starts and stops recording", async () => {
     const started = await call<{ recording: boolean; intervalMs: number }>("startDebugRecording", {
-      targets: [{ kind: "app", id: "app" }],
+      targets: [{ kind: "app", id: "state" }],
       intervalMs: 5000,
     });
-    expect(started).toMatchObject({ recording: true, intervalMs: 5000, targets: [{ kind: "app", id: "app" }] });
+    expect(started).toMatchObject({ recording: true, intervalMs: 5000, targets: [{ kind: "app", id: "state" }] });
 
     const stopped = await call<{ recording: boolean }>("stopDebugRecording", {});
     expect(stopped.recording).toBe(false);

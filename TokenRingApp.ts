@@ -1,7 +1,7 @@
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
-import TypedRegistry from "@tokenring-ai/utility/registry/TypedRegistry";
+import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import { generateHumanId } from "@tokenring-ai/utility/string/generateHumanId";
 import DebugService from "./debug/DebugService.ts";
@@ -30,12 +30,8 @@ export default class TokenRingApp {
   readonly runningServices = new Set<TokenRingService>();
   readonly stoppingServices = new Set<TokenRingService>();
   readonly backgroundTasks = new Map<string, number>();
-  services = new TypedRegistry<TokenRingService>();
-  requireService = this.services.requireItemByType;
-  addService = this.services.addOne;
-  addServices = this.services.addMany;
-  getService = this.services.getItemByType;
-  getServices = this.services.getItems;
+  services = new KeyedRegistry<TokenRingService>();
+
   private readonly abortController = new AbortController();
   private shutdownStartedAt?: number | undefined;
   public readonly appConfig: TokenRingAppConfig["app"];
@@ -53,7 +49,32 @@ export default class TokenRingApp {
     });
     // Core introspection service, always available so the debugging UI works
     // regardless of which plugins are installed.
-    this.addService(new DebugService(this));
+    this.addService(DebugService, new DebugService(this));
+  }
+
+  getService = <T extends TokenRingService>(classObject: abstract new (...args: any[]) => T) => {
+    return this.services.get(classObject.name) as T | undefined;
+  };
+
+  requireService = <T extends TokenRingService>(classObject: abstract new (...args: any[]) => T) => {
+    return this.services.require(classObject.name) as T;
+  };
+
+  addService<T extends TokenRingService>(classObject: abstract new (...args: any[]) => T, impl: T) {
+    this.services.set(classObject.name, impl);
+    return impl;
+  }
+
+  getServiceNames() {
+    return this.services.keysArray();
+  }
+
+  getServiceEntries() {
+    return this.services.entriesArray();
+  }
+
+  waitForService<T extends TokenRingService>(type: abstract new (...args: any[]) => T, callback: (item: T) => void) {
+    return this.services.waitFor(type.name, callback as (item: TokenRingService) => void);
   }
 
   /**
@@ -92,14 +113,14 @@ export default class TokenRingApp {
     const signal = this.abortController.signal;
     let runError: unknown;
     try {
-      for (const service of this.services.getItems()) {
+      for (const service of this.services.values()) {
         if (service.start) {
           await service.start(signal);
         }
       }
 
       await Promise.all(
-        this.services.getItems().map(async service => {
+        this.services.valuesArray().map(async service => {
           if (!service.run) return;
           this.runningServices.add(service);
 
@@ -139,7 +160,7 @@ export default class TokenRingApp {
       const stopShutdownMonitor = this.startShutdownMonitor();
       try {
         const stopResults = await Promise.allSettled(
-          this.services.getItems().map(async service => {
+          this.services.valuesArray().map(async service => {
             if (!service.stop) return;
 
             this.stoppingServices.add(service);
@@ -167,9 +188,6 @@ export default class TokenRingApp {
       }
     }
   }
-
-  waitForService = <R extends TokenRingService>(serviceType: abstract new (...args: any[]) => R, callback: (service: R) => void): void =>
-    this.services.waitForItemByType(serviceType, callback);
 
   /*
    * Track an app-level promise and log any errors that occur.

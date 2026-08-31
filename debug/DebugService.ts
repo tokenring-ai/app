@@ -6,9 +6,10 @@ import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import { DebugState, type DebugTargetRef } from "../state/DebugState.ts";
 import type TokenRingApp from "../TokenRingApp.ts";
 import type { TokenRingService } from "../types.ts";
+import { createApplicationSnapshotSource } from "./applicationSnapshotSource.ts";
 import { formatSnapshotTimestamp, isValidSnapshotName, SNAPSHOT_EXTENSION, sanitizeSnapshotLabel } from "./snapshotName.ts";
 
-/** Something the debugger can capture, beyond the app itself. */
+/** Something the debugger can capture. */
 export interface DebugSnapshotSource {
   /** Groups targets in the UI and prefixes their snapshot files, e.g. `agent`. */
   readonly kind: string;
@@ -39,20 +40,12 @@ export interface DebugSnapshotInfo {
 /** How often the recorder re-checks state while idle or between captures. */
 const RECORDER_POLL_INTERVAL_MS = 500;
 
-/** The target ref for the app itself, which is always capturable. */
-export const APP_TARGET: DebugTarget = {
-  kind: "app",
-  id: "app",
-  label: "Application",
-  description: "TokenRingApp state manager, services and configuration",
-};
-
 /**
  * Captures debugging snapshots of live app and agent state and writes them to
  * `<workspaceDirectory>/debug` as pretty-printed JSON.
  *
- * The app itself is always capturable; other subsystems register a
- * {@link DebugSnapshotSource} so their objects show up as targets too.
+ * Subsystems register a {@link DebugSnapshotSource} so their objects show up
+ * as targets. Application state is registered as one of those sources.
  */
 export default class DebugService implements TokenRingService {
   readonly name = "DebugService";
@@ -62,12 +55,10 @@ export default class DebugService implements TokenRingService {
 
   constructor(private readonly app: TokenRingApp) {
     this.app.initializeState(DebugState, {});
+    this.registerSnapshotSource(createApplicationSnapshotSource(app));
   }
 
   registerSnapshotSource(source: DebugSnapshotSource): void {
-    if (source.kind === APP_TARGET.kind) {
-      throw new Error(`Debug snapshot source kind "${source.kind}" is reserved for the app itself`);
-    }
     this.sources.set(source.kind, source);
   }
 
@@ -76,9 +67,9 @@ export default class DebugService implements TokenRingService {
     return this.app.getWorkspaceResolvedPath("debug");
   }
 
-  /** Everything that can be captured right now, app first. */
+  /** Everything that can be captured right now. */
   listTargets(): DebugTarget[] {
-    return [APP_TARGET, ...this.sources.valuesArray().flatMap(source => source.listTargets())];
+    return this.sources.valuesArray().flatMap(source => source.listTargets());
   }
 
   /**
@@ -89,7 +80,7 @@ export default class DebugService implements TokenRingService {
     const dump = this.buildSnapshot(target);
     if (!dump) return null;
 
-    const label = target.kind === APP_TARGET.kind ? "app-state" : `${sanitizeSnapshotLabel(target.kind)}-${sanitizeSnapshotLabel(target.id)}`;
+    const label = `${sanitizeSnapshotLabel(target.kind)}-${sanitizeSnapshotLabel(target.id)}`;
     return this.writeSnapshot(label, dump);
   }
 
@@ -109,7 +100,7 @@ export default class DebugService implements TokenRingService {
         const stats = await fs.stat(path.join(directory, entry));
         snapshots.push({
           name: entry,
-          kind: entry.startsWith("app-state-") ? APP_TARGET.kind : (entry.split("-")[0] ?? "unknown"),
+          kind: entry.split("-")[0] ?? "unknown",
           sizeBytes: stats.size,
           capturedAt: stats.mtimeMs,
         });
@@ -204,7 +195,7 @@ export default class DebugService implements TokenRingService {
 
   /** Builds the snapshot envelope for a target, or `undefined` when it is gone. */
   private buildSnapshot(target: DebugTargetRef): Record<string, unknown> | undefined {
-    const data = target.kind === APP_TARGET.kind ? this.captureAppState() : this.sources.get(target.kind)?.captureTarget(target.id);
+    const data = this.sources.get(target.kind)?.captureTarget(target.id);
     if (data === undefined) return undefined;
 
     return {
@@ -212,23 +203,6 @@ export default class DebugService implements TokenRingService {
       sessionId: this.app.sessionId,
       target,
       data,
-    };
-  }
-
-  /** Dumps the app state manager plus enough runtime context to make it readable. */
-  private captureAppState(): Record<string, unknown> {
-    return {
-      sessionId: this.app.sessionId,
-      isShuttingDown: this.app.isShuttingDown,
-      appConfig: this.app.appConfig,
-      services: this.app.getServices().map(service => ({
-        name: service.name,
-        description: service.description,
-        running: this.app.runningServices.has(service),
-        stopping: this.app.stoppingServices.has(service),
-      })),
-      backgroundTasks: Object.fromEntries(this.app.backgroundTasks),
-      state: serializeStateManager(this.app.stateManager),
     };
   }
 
@@ -258,20 +232,4 @@ export default class DebugService implements TokenRingService {
       }
     }
   }
-}
-
-/**
- * Serializes every slice independently so one slice that fails to serialize
- * shows up as an error in the dump instead of losing the whole snapshot.
- */
-function serializeStateManager(stateManager: TokenRingApp["stateManager"]): Record<string, unknown> {
-  const serialized: Record<string, unknown> = {};
-  for (const slice of stateManager.slices()) {
-    try {
-      serialized[slice.name] = slice.serialize();
-    } catch (error) {
-      serialized[slice.name] = { __serializationError: formatError(error, { includeStack: false }) };
-    }
-  }
-  return serialized;
 }

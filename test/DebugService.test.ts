@@ -70,19 +70,19 @@ describe("DebugService", () => {
     expect(debugService.getDebugDirectory()).toBe(path.join(workspaceDirectory, "debug"));
   });
 
-  it("always offers the app as a capture target", () => {
+  it("offers application state as a capture target", () => {
     expect(debugService.listTargets()).toEqual([
       {
         kind: "app",
-        id: "app",
-        label: "Application",
+        id: "state",
+        label: "Application State",
         description: "TokenRingApp state manager, services and configuration",
       },
     ]);
   });
 
   it("captures app state as pretty-printed JSON under workspaceDirectory/debug", async () => {
-    const name = await debugService.capture({ kind: "app", id: "app" });
+    const name = await debugService.capture({ kind: "app", id: "state" });
 
     expect(name).toMatch(/^app-state-\d{8}T\d{2}:\d{2}:\d{2}\.json$/);
     expect(await readDebugDirectory()).toEqual([name!]);
@@ -92,14 +92,14 @@ describe("DebugService", () => {
 
     const snapshot = JSON.parse(raw);
     expect(snapshot.sessionId).toBe(app.sessionId);
-    expect(snapshot.target).toEqual({ kind: "app", id: "app" });
+    expect(snapshot.target).toEqual({ kind: "app", id: "state" });
     expect(snapshot.data.state.AppLogsState).toBeDefined();
     expect(snapshot.data.services.map((service: { name: string }) => service.name)).toContain("DebugService");
   });
 
   it("suffixes snapshots captured within the same second", async () => {
-    const first = await debugService.capture({ kind: "app", id: "app" });
-    const second = await debugService.capture({ kind: "app", id: "app" });
+    const first = await debugService.capture({ kind: "app", id: "state" });
+    const second = await debugService.capture({ kind: "app", id: "state" });
 
     expect(second).not.toBe(first);
     expect(await readDebugDirectory()).toHaveLength(2);
@@ -117,7 +117,7 @@ describe("DebugService", () => {
     }
     app.initializeState(BrokenState, {});
 
-    const name = await debugService.capture({ kind: "app", id: "app" });
+    const name = await debugService.capture({ kind: "app", id: "state" });
     const snapshot = JSON.parse(await fs.readFile(path.join(workspaceDirectory, "debug", name!), "utf8"));
 
     expect(snapshot.data.state.BrokenState.__serializationError).toContain("cannot serialize");
@@ -136,8 +136,8 @@ describe("DebugService", () => {
       debugService.registerSnapshotSource(source);
     });
 
-    it("lists their targets after the app", () => {
-      expect(debugService.listTargets().map(target => target.id)).toEqual(["app", "abc123"]);
+    it("lists their targets after application state", () => {
+      expect(debugService.listTargets().map(target => target.id)).toEqual(["state", "abc123"]);
     });
 
     it("captures a target into a kind-prefixed file", async () => {
@@ -152,10 +152,6 @@ describe("DebugService", () => {
       expect(await debugService.capture({ kind: "agent", id: "gone" })).toBeNull();
       expect(await debugService.capture({ kind: "nosuchkind", id: "abc123" })).toBeNull();
     });
-
-    it("refuses to shadow the app target", () => {
-      expect(() => debugService.registerSnapshotSource({ ...source, kind: "app" })).toThrow(/reserved/);
-    });
   });
 
   describe("listing, reading and deleting snapshots", () => {
@@ -166,7 +162,7 @@ describe("DebugService", () => {
         listTargets: () => [],
         captureTarget: () => ({ ok: true }),
       });
-      const appSnapshot = await debugService.capture({ kind: "app", id: "app" });
+      const appSnapshot = await debugService.capture({ kind: "app", id: "state" });
       const agentSnapshot = await debugService.capture({ kind: "agent", id: "abc" });
 
       const listed = await debugService.listSnapshots();
@@ -181,7 +177,7 @@ describe("DebugService", () => {
     });
 
     it("reads a snapshot back verbatim", async () => {
-      const name = await debugService.capture({ kind: "app", id: "app" });
+      const name = await debugService.capture({ kind: "app", id: "state" });
       const content = await debugService.readSnapshot(name!);
       expect(JSON.parse(content!).sessionId).toBe(app.sessionId);
     });
@@ -192,7 +188,7 @@ describe("DebugService", () => {
     });
 
     it("deletes a snapshot once", async () => {
-      const name = await debugService.capture({ kind: "app", id: "app" });
+      const name = await debugService.capture({ kind: "app", id: "state" });
       expect(await debugService.deleteSnapshot(name!)).toBe(true);
       expect(await debugService.deleteSnapshot(name!)).toBe(false);
       expect(await debugService.listSnapshots()).toEqual([]);
@@ -201,7 +197,7 @@ describe("DebugService", () => {
 
   describe("recording", () => {
     it("captures immediately when recording starts and tracks status", async () => {
-      debugService.startRecording([{ kind: "app", id: "app" }], 5000);
+      debugService.startRecording([{ kind: "app", id: "state" }], 5000);
 
       const state = app.getState(DebugState);
       expect(state.recording).toBe(true);
@@ -213,12 +209,12 @@ describe("DebugService", () => {
     });
 
     it("clamps the interval to the minimum", () => {
-      debugService.startRecording([{ kind: "app", id: "app" }], 10);
+      debugService.startRecording([{ kind: "app", id: "state" }], 10);
       expect(app.getState(DebugState).intervalMs).toBe(1000);
     });
 
     it("stops recording", async () => {
-      debugService.startRecording([{ kind: "app", id: "app" }], 5000);
+      debugService.startRecording([{ kind: "app", id: "state" }], 5000);
       await app.timedWaitForState(DebugState, current => current.captureCount > 0, 2000, new AbortController().signal);
 
       debugService.stopRecording();

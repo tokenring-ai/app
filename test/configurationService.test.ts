@@ -71,8 +71,8 @@ describe("ConfigurationService", () => {
       overridesFiles: { global: globalConfigFile, workspace: workspaceConfigFile },
       overlayError,
     });
-    app.addService(service);
-    pluginManager = app.addService(new PluginManager(app));
+    app.addService(ConfigurationService, service);
+    pluginManager = app.addService(PluginManager, new PluginManager(app));
 
     reconfigureSpy = mock(() => {});
     const reconfigurablePlugin = {

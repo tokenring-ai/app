@@ -15,7 +15,7 @@ describe("App Integration Tests", () => {
     mock.clearAllMocks();
 
     app = createTestingApp();
-    pluginManager = app.addService(new PluginManager(app));
+    pluginManager = app.addService(PluginManager, new PluginManager(app));
   });
 
   afterEach(() => {
@@ -24,8 +24,7 @@ describe("App Integration Tests", () => {
 
   describe("App and PluginManager Integration", () => {
     it("should register PluginManager as a service", () => {
-      const services = app.getServices();
-      expect(services).toContain(pluginManager);
+      expect(app.getService(PluginManager)).toBe(pluginManager);
     });
 
     it("should integrate plugin lifecycle with app", async () => {
@@ -59,7 +58,7 @@ describe("App Integration Tests", () => {
     it("should handle multiple plugins with different lifecycle requirements", async () => {
       // Create fresh pluginManager for this test
       app = createTestingApp();
-      pluginManager = app.addService(new PluginManager(app));
+      pluginManager = app.addService(PluginManager, new PluginManager(app));
 
       class Plugin1 implements TokenRingPlugin {
         readonly name = "Plugin1";
@@ -197,7 +196,7 @@ describe("App Integration Tests", () => {
     it("should orchestrate full app lifecycle", async () => {
       // Create fresh app and pluginManager for this test
       app = createTestingApp();
-      pluginManager = app.addService(new PluginManager(app));
+      pluginManager = app.addService(PluginManager, new PluginManager(app));
 
       class Service1 implements TokenRingService {
         readonly name = "Service1";
@@ -230,7 +229,8 @@ describe("App Integration Tests", () => {
       const plugin = new WorkflowPlugin();
 
       // Add services
-      app.addServices([service1, service2]);
+      app.addService(Service1, service1);
+      app.addService(Service2, service2);
 
       // Install plugin
       await pluginManager.installPlugins([plugin]);
@@ -275,7 +275,8 @@ describe("App Integration Tests", () => {
       const serviceA = new ServiceA();
       const serviceB = new ServiceB();
 
-      app.addServices([serviceA, serviceB]);
+      app.addService(ServiceA, serviceA);
+      app.addService(ServiceB, serviceB);
 
       const runPromise = app.run();
 
@@ -378,7 +379,7 @@ describe("App Integration Tests", () => {
       });
 
       // Plugin manager should work with configured app
-      const pluginManagerWithConfig = appWithConfig.addService(new PluginManager(appWithConfig));
+      const pluginManagerWithConfig = appWithConfig.addService(PluginManager, new PluginManager(appWithConfig));
 
       class ConfigTestPlugin implements TokenRingPlugin {
         readonly name = "ConfigTestPlugin";
@@ -415,7 +416,7 @@ describe("App Integration Tests", () => {
       const errorService = new Service1();
 
       spyOn(errorService, "run");
-      app.addService(errorService);
+      app.addService(Service1, errorService);
       await Promise.all([app.run(), delay(100).then(() => app.shutdown())]);
 
       expect(errorService.run).toHaveBeenCalled();
@@ -460,7 +461,7 @@ describe("App Integration Tests", () => {
     it("should handle concurrent operations", async () => {
       // Create fresh app and pluginManager for this test
       app = createTestingApp();
-      pluginManager = app.addService(new PluginManager(app));
+      pluginManager = app.addService(PluginManager, new PluginManager(app));
 
       class ConcurrentPlugin1 implements TokenRingPlugin {
         readonly name = "ConcurrentPlugin1";
@@ -515,7 +516,8 @@ describe("App Integration Tests", () => {
         description = "Service 2";
       }
 
-      app.addServices([new Service1(), new Service2()]);
+      app.addService(Service1, new Service1());
+      app.addService(Service2, new Service2());
 
       let callbackCalled = false;
       app.waitForService(Service2, service => {
