@@ -112,18 +112,18 @@ describe("TokenRingApp", () => {
 
       const mockCallback = mock();
 
-      // Mock the waitForService method
-      const mockWaitForItemByType = mock();
+      // Mock the services registry's waitFor
+      const mockWaitFor = mock();
       Object.defineProperty(app, "services", {
         get: () => ({
-          waitForItemByType: mockWaitForItemByType,
+          waitFor: mockWaitFor,
         }),
       });
 
       app.waitForService(MockService, mockCallback);
 
-      // This should call the registry's waitForItemByType
-      expect(mockWaitForItemByType).toHaveBeenCalledWith(MockService, mockCallback);
+      // This should call the registry's waitFor with the service class name
+      expect(mockWaitFor).toHaveBeenCalledWith("MockService", mockCallback);
     });
   });
 

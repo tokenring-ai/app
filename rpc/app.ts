@@ -1,7 +1,9 @@
 import type TokenRingApp from "@tokenring-ai/app";
 import { createRPCEndpoint } from "@tokenring-ai/rpc/createRPCEndpoint";
+import ConfigurationService from "../config/ConfigurationService.ts";
 import DebugService from "../debug/DebugService.ts";
 import PluginManager from "../PluginManager.ts";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import { AppLogsState } from "../state/AppLogsState.ts";
 import { DebugState } from "../state/DebugState.ts";
 import AppRpcSchema, { type DebugRecordingStatus } from "./schema.ts";
@@ -17,20 +19,31 @@ function projectRecordingStatus(app: TokenRingApp): DebugRecordingStatus {
     captureCount: state.captureCount,
     lastSnapshot: state.lastSnapshot,
     lastError: state.lastError,
+    retainLast: state.retainLast,
   };
 }
 
 export default createRPCEndpoint(AppRpcSchema, {
   listPlugins(_args, app: TokenRingApp) {
     const pluginManager = app.requireService(PluginManager);
+    // Match the Configuration view, which only lists plugins whose config
+    // produces at least one editable UI slice.
+    const configurable = new Set(
+      app
+        .getService(ConfigurationService)
+        ?.getUISchemas()
+        .map(uiSchema => uiSchema.pluginName) ?? [],
+    );
     return {
       plugins: pluginManager.getPlugins().map(p => ({
         name: p.name,
         displayName: p.displayName,
         version: p.version,
         description: p.description,
-        hasConfig: "configSchema" in p,
+        hasConfig: configurable.has(p.name),
+        ...app.registrationsFor(p.name),
       })),
+      requiresRestart: app.getState(AppConfigurationState).requiresRestartToFullyApplyConfig,
     };
   },
   getLogs(_args, app: TokenRingApp) {
@@ -84,5 +97,10 @@ export default createRPCEndpoint(AppRpcSchema, {
     for await (const _state of app.subscribeStateAsync(DebugState, signal)) {
       yield projectRecordingStatus(app);
     }
+  },
+
+  setDebugRetention(args, app: TokenRingApp) {
+    app.requireService(DebugService).setRetainLast(args.retainLast);
+    return projectRecordingStatus(app);
   },
 });

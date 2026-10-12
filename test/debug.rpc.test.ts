@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import DebugService from "../debug/DebugService.ts";
 import appRpc from "../rpc/app.ts";
+import { DebugState } from "../state/DebugState.ts";
 import TokenRingApp from "../TokenRingApp.ts";
 
 type StatusResult = { status: string };
@@ -74,7 +75,18 @@ describe("debug RPC", () => {
     });
     expect(started).toMatchObject({ recording: true, intervalMs: 5000, targets: [{ kind: "app", id: "state" }] });
 
-    const stopped = await call<{ recording: boolean }>("stopDebugRecording", {});
+    const stopped = await call<{ recording: boolean; retainLast: number | null }>("stopDebugRecording", {});
     expect(stopped.recording).toBe(false);
+    expect(stopped.retainLast).toBeNull();
+  });
+
+  it("stores retainLast immediately and reports it on the recording status", async () => {
+    const updated = await call<{ retainLast: number | null; recording: boolean }>("setDebugRetention", { retainLast: 10 });
+    expect(updated).toMatchObject({ retainLast: 10, recording: false });
+    expect(app.getState(DebugState).retainLast).toBe(10);
+
+    const cleared = await call<{ retainLast: number | null }>("setDebugRetention", { retainLast: null });
+    expect(cleared.retainLast).toBeNull();
+    expect(app.getState(DebugState).retainLast).toBeNull();
   });
 });

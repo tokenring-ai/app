@@ -62,7 +62,16 @@ export default class StateManager<SpecificStateSliceType extends SerializableSta
   }
 
   serialize(): Record<string, object> {
-    return Object.fromEntries(this.state.mapValues(slice => [slice.name, slice.serialize()]));
+    return Object.fromEntries(
+      this.state.mapValues(slice => {
+        try {
+          return [slice.name, slice.serialize()];
+        } catch (error: unknown) {
+          // One broken slice must not lose the rest of the debug snapshot.
+          return [slice.name, { __serializationError: error instanceof Error ? error.message : String(error) }];
+        }
+      }),
+    );
   }
 
   deserialize(data: Record<string, unknown>, onMissing?: (key: string) => void): void {

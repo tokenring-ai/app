@@ -123,7 +123,7 @@ describe("ConfigurationService", () => {
       expect(result).toEqual({ ok: true });
 
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 7 } });
-      expect(fs.readFileSync(globalConfigFile, "utf8")).toStartWith("# TokenRing user configuration overrides.");
+      expect(fs.readFileSync(globalConfigFile, "utf8")).toStartWith("# TokenRing global configuration overrides.");
       expect(fs.existsSync(`${globalConfigFile}.tmp`)).toBe(false);
 
       const fullConfig = app.getState(AppConfigurationState).mergedConfig;
@@ -248,7 +248,7 @@ describe("ConfigurationService", () => {
 
       expect(readOverridesFile()).toEqual({ testPlugin: { size: 7, name: "from-user" } });
       expect(readProjectOverridesFile()).toEqual({ testPlugin: { size: 8 } });
-      expect(fs.readFileSync(workspaceConfigFile, "utf8")).toStartWith("# TokenRing project configuration overrides.");
+      expect(fs.readFileSync(workspaceConfigFile, "utf8")).toStartWith("# TokenRing workspace configuration overrides.");
 
       const fullConfig = app.getState(AppConfigurationState).mergedConfig;
       expect((fullConfig as any).testPlugin).toMatchObject({ size: 8, name: "from-user" });

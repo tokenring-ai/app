@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import deepClone from "@tokenring-ai/utility/object/deepClone";
 import { isPlainObject } from "@tokenring-ai/utility/object/isPlainObject";
-import joinDefault from "@tokenring-ai/utility/string/joinDefault";
 import { file, Glob, YAML } from "bun";
 import type { z } from "zod";
 import type { TokenRingAppConfigSchema } from "./schema.ts";
@@ -85,7 +84,9 @@ export async function buildTokenRingAppConfigLayers<T extends z.ZodType>(
     appConfig,
     globalConfig,
     workspaceConfig,
-    overlayError: joinDefault("\n", overlayErrors, undefined),
+    // joinDefault's default parameter is "", so passing `undefined` through it
+    // would yield "" — and absent must stay undefined for the UI.
+    overlayError: overlayErrors.length > 0 ? overlayErrors.join("\n") : undefined,
   };
 }
 

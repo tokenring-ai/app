@@ -7,9 +7,12 @@ import { YAML } from "bun";
 import { z } from "zod";
 import ConfigurationService from "../config/ConfigurationService.ts";
 import PluginManager from "../PluginManager.ts";
+import appRpc from "../rpc/app.ts";
 import configRpc from "../rpc/config.ts";
 import ConfigRpcSchema from "../rpc/configSchema.ts";
+import type AppRpcSchema from "../rpc/schema.ts";
 import { TokenRingAppConfigSchema } from "../schema.ts";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import TokenRingApp from "../TokenRingApp.ts";
 import type { TokenRingPlugin } from "../types.ts";
 
@@ -60,7 +63,14 @@ describe("Config RPC", () => {
       configSchema: pluginConfig,
       reconfigure() {},
     } satisfies TokenRingPlugin<typeof pluginConfig>;
-    await pluginManager.installPlugins([plugin]);
+    const emptyConfigPlugin = {
+      name: "empty-plugin",
+      displayName: "Empty Plugin",
+      version: "1.0.0",
+      description: "Plugin whose config has nothing editable",
+      configSchema: z.object({}),
+    } satisfies TokenRingPlugin<z.ZodObject<{}>>;
+    await pluginManager.installPlugins([plugin, emptyConfigPlugin]);
 
     client = createLocalRPCClient<typeof ConfigRpcSchema>(configRpc, app);
   });
@@ -75,6 +85,24 @@ describe("Config RPC", () => {
     expect(result.plugins.map(plugin => plugin.pluginName)).toEqual(["widget-plugin"]);
     expect(result.overridesFiles).toEqual({ global: overridesFile, workspace: projectOverridesFile });
     expect(result.overlayError).toBeNull();
+  });
+
+  it("listPlugins only flags plugins the Configuration view lists as configurable", async () => {
+    const appClient = createLocalRPCClient<typeof AppRpcSchema>(appRpc, app);
+    const { plugins } = await appClient.listPlugins({});
+    expect(Object.fromEntries(plugins.map(plugin => [plugin.name, plugin.hasConfig]))).toEqual({
+      "widget-plugin": true,
+      "empty-plugin": false,
+    });
+  });
+
+  it("listPlugins reports when a config change needs a restart to fully apply", async () => {
+    const appClient = createLocalRPCClient<typeof AppRpcSchema>(appRpc, app);
+    expect((await appClient.listPlugins({})).requiresRestart).toBe(false);
+    app.mutateState(AppConfigurationState, state => {
+      state.requiresRestartToFullyApplyConfig = true;
+    });
+    expect((await appClient.listPlugins({})).requiresRestart).toBe(true);
   });
 
   it("applyConfig persists and getConfigValues round-trips the override", async () => {

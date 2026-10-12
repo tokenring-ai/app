@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import DebugService, { type DebugSnapshotSource } from "../debug/DebugService.ts";
+import { REDACTED } from "../debug/redactSnapshot.ts";
 import { formatSnapshotTimestamp, isValidSnapshotName, sanitizeSnapshotLabel } from "../debug/snapshotName.ts";
+import { AppConfigurationState } from "../state/AppConfigurationState.ts";
 import { DebugState } from "../state/DebugState.ts";
 import TokenRingApp from "../TokenRingApp.ts";
 import { AppStateSlice } from "../types.ts";
@@ -28,6 +30,11 @@ function createApp(directory: string): TokenRingApp {
 
 async function readDebugDirectory(): Promise<string[]> {
   return (await fs.readdir(path.join(workspaceDirectory, "debug"))).sort();
+}
+
+async function setSnapshotMtime(name: string, capturedAt: number): Promise<void> {
+  const when = new Date(capturedAt);
+  await fs.utimes(path.join(workspaceDirectory, "debug", name), when, when);
 }
 
 beforeEach(async () => {
@@ -77,6 +84,7 @@ describe("DebugService", () => {
         id: "state",
         label: "Application State",
         description: "TokenRingApp state manager, services and configuration",
+        displayName: "Application State",
       },
     ]);
   });
@@ -97,6 +105,18 @@ describe("DebugService", () => {
     expect(snapshot.data.services.map((service: { name: string }) => service.name)).toContain("DebugService");
   });
 
+  it("redacts secrets held in the configuration overrides", async () => {
+    app.mutateState(AppConfigurationState, state => {
+      state.globalConfig = { openai: { apiKey: "sk-global" } };
+    });
+
+    const name = await debugService.capture({ kind: "app", id: "state" });
+    const raw = await fs.readFile(path.join(workspaceDirectory, "debug", name!), "utf8");
+
+    expect(raw).not.toContain("sk-global");
+    expect(JSON.parse(raw).data.state.AppConfigurationState.globalConfig.openai.apiKey).toBe(REDACTED);
+  });
+
   it("suffixes snapshots captured within the same second", async () => {
     const first = await debugService.capture({ kind: "app", id: "state" });
     const second = await debugService.capture({ kind: "app", id: "state" });
@@ -106,7 +126,7 @@ describe("DebugService", () => {
   });
 
   it("reports a slice that fails to serialize instead of losing the snapshot", async () => {
-    class BrokenState extends AppStateSlice<z.ZodTypeAny> {
+    class BrokenState extends AppStateSlice<z.ZodType> {
       constructor() {
         super("BrokenState", z.object({}));
       }
@@ -140,12 +160,44 @@ describe("DebugService", () => {
       expect(debugService.listTargets().map(target => target.id)).toEqual(["state", "abc123"]);
     });
 
+    it("tags each target with its source's display name for grouping", () => {
+      expect(debugService.listTargets().map(target => [target.kind, target.displayName])).toEqual([
+        ["app", "Application State"],
+        ["agent", "Agents"],
+      ]);
+    });
+
     it("captures a target into a kind-prefixed file", async () => {
       const name = await debugService.capture({ kind: "agent", id: "abc123" });
 
       expect(name).toMatch(/^agent-abc123-\d{8}T\d{2}:\d{2}:\d{2}\.json$/);
       const snapshot = JSON.parse(await fs.readFile(path.join(workspaceDirectory, "debug", name!), "utf8"));
       expect(snapshot.data).toEqual({ agentId: "abc123", greeting: "hello" });
+    });
+
+    it("redacts credential-looking keys, including inside class instances", async () => {
+      class Client {
+        apiKey = "sk-instance";
+      }
+      debugService.registerSnapshotSource({
+        kind: "secrets",
+        displayName: "Secrets",
+        listTargets: () => [],
+        captureTarget: () => ({
+          config: { apiKey: "sk-live", maxTokens: 4096, headers: { Authorization: "Bearer abc" }, client_secret: "", label: "ok" },
+          client: new Client(),
+        }),
+      });
+
+      const name = await debugService.capture({ kind: "secrets", id: "x" });
+      const raw = await fs.readFile(path.join(workspaceDirectory, "debug", name!), "utf8");
+
+      expect(raw).not.toContain("sk-live");
+      expect(raw).not.toContain("sk-instance");
+      expect(raw).not.toContain("Bearer abc");
+      const snapshot = JSON.parse(raw);
+      expect(snapshot.data.config).toEqual({ apiKey: REDACTED, maxTokens: 4096, headers: { Authorization: REDACTED }, client_secret: "", label: "ok" });
+      expect(snapshot.data.client.apiKey).toBe(REDACTED);
     });
 
     it("returns null for a target that no longer exists", async () => {
@@ -228,6 +280,95 @@ describe("DebugService", () => {
 
       expect(app.getState(DebugState).lastError).toContain("agent/gone");
       expect(app.getState(DebugState).captureCount).toBe(0);
+    });
+  });
+
+  describe("retention", () => {
+    it("keeps every snapshot when retainLast is null, including a checkpoint that omits it", async () => {
+      expect(app.getState(DebugState).retainLast).toBeNull();
+      const serialized = app.getState(DebugState).serialize();
+      const { retainLast: _omitted, ...legacy } = serialized;
+      app.getState(DebugState).deserialize(app.getState(DebugState).serializationSchema.parse(legacy));
+      expect(app.getState(DebugState).retainLast).toBeNull();
+
+      await debugService.capture({ kind: "app", id: "state" });
+      await debugService.capture({ kind: "app", id: "state" });
+      expect(await readDebugDirectory()).toHaveLength(2);
+    });
+
+    it("keeps only the newest snapshots after a capture, breaking equal times by name", async () => {
+      const oldest = (await debugService.capture({ kind: "app", id: "state" }))!;
+      const tiedLow = (await debugService.capture({ kind: "app", id: "state" }))!;
+      const tiedHigh = (await debugService.capture({ kind: "app", id: "state" }))!;
+      await setSnapshotMtime(oldest, 1_000);
+      await setSnapshotMtime(tiedLow, 5_000);
+      await setSnapshotMtime(tiedHigh, 5_000);
+
+      // Changing the setting does not delete anything until the next successful capture.
+      debugService.setRetainLast(2);
+      expect(app.getState(DebugState).retainLast).toBe(2);
+      expect(await readDebugDirectory()).toHaveLength(3);
+
+      const newest = (await debugService.capture({ kind: "app", id: "state" }))!;
+      const preferredTie = [tiedLow, tiedHigh].sort((a, b) => b.localeCompare(a))[0]!;
+      expect(await readDebugDirectory()).toEqual([newest, preferredTie].sort());
+    });
+
+    it("does not prune when the capture target is gone", async () => {
+      await debugService.capture({ kind: "app", id: "state" });
+      await debugService.capture({ kind: "app", id: "state" });
+      debugService.setRetainLast(1);
+
+      expect(await debugService.capture({ kind: "agent", id: "gone" })).toBeNull();
+      expect(await readDebugDirectory()).toHaveLength(2);
+    });
+
+    it("keeps deleting the rest when one snapshot cannot be removed", async () => {
+      const oldest = (await debugService.capture({ kind: "app", id: "state" }))!;
+      const middle = (await debugService.capture({ kind: "app", id: "state" }))!;
+      const newer = (await debugService.capture({ kind: "app", id: "state" }))!;
+      await setSnapshotMtime(oldest, 1_000);
+      await setSnapshotMtime(middle, 2_000);
+      await setSnapshotMtime(newer, 3_000);
+      debugService.setRetainLast(1);
+
+      const original = debugService.deleteSnapshot.bind(debugService);
+      const spy = spyOn(debugService, "deleteSnapshot").mockImplementation(async (name: string) => {
+        if (name === newer) throw new Error("locked");
+        return original(name);
+      });
+      try {
+        const newest = (await debugService.capture({ kind: "app", id: "state" }))!;
+        expect(await readDebugDirectory()).toEqual([newest, newer].sort());
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it("prunes when the recorder loop captures", async () => {
+      const older = (await debugService.capture({ kind: "app", id: "state" }))!;
+      await setSnapshotMtime(older, 1_000);
+      app.mutateState(DebugState, state => {
+        state.setRetainLast(1);
+        state.start([{ kind: "app", id: "state" }], 1000);
+      });
+
+      const abort = new AbortController();
+      const running = debugService.run(abort.signal);
+      try {
+        await app.timedWaitForState(DebugState, current => current.captureCount > 0, 2000, abort.signal);
+        const listed = await debugService.listSnapshots();
+        const newest = app.getState(DebugState).lastSnapshot;
+        expect(newest).toBeString();
+        if (typeof newest !== "string") {
+          throw new Error("expected lastSnapshot to be a non-null string");
+        }
+        expect(listed.map(entry => entry.name)).toEqual([newest]);
+        expect(listed[0]?.name).not.toBe(older);
+      } finally {
+        abort.abort();
+        await running;
+      }
     });
   });
 });

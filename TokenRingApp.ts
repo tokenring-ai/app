@@ -5,6 +5,7 @@ import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import formatLogMessages from "@tokenring-ai/utility/string/formatLogMessage";
 import { generateHumanId } from "@tokenring-ai/utility/string/generateHumanId";
 import DebugService from "./debug/DebugService.ts";
+import { bindRegistration, noteRegistration, type PluginRegistrations, type RegistrationKind } from "./registrationOwner.ts";
 import StateManager from "./StateManager.ts";
 import type { AppSessionCheckpoint, TokenRingAppConfig } from "./schema.ts";
 import { AppConfigurationState, type ConfigLayer } from "./state/AppConfigurationState.ts";
@@ -31,6 +32,13 @@ export default class TokenRingApp {
   readonly stoppingServices = new Set<TokenRingService>();
   readonly backgroundTasks = new Map<string, number>();
   services = new KeyedRegistry<TokenRingService>();
+  /** Plugin package that registered each name. Absent when it was not a plugin lifecycle. */
+  private registrationOwners: Record<RegistrationKind, Map<string, string>> = {
+    services: new Map(),
+    tools: new Map(),
+    commands: new Map(),
+    rpcMethods: new Map(),
+  };
 
   private readonly abortController = new AbortController();
   private shutdownStartedAt?: number | undefined;
@@ -61,8 +69,32 @@ export default class TokenRingApp {
   };
 
   addService<T extends TokenRingService>(classObject: abstract new (...args: any[]) => T, impl: T) {
+    noteRegistration("services", classObject.name);
     this.services.set(classObject.name, impl);
     return impl;
+  }
+
+  recordRegistration(kind: RegistrationKind, name: string, pluginName: string): void {
+    this.registrationOwners[kind].set(name, pluginName);
+  }
+
+  forgetRegistration(kind: RegistrationKind, name: string): void {
+    this.registrationOwners[kind].delete(name);
+  }
+
+  /** Names currently attributed to `pluginName`, sorted. A later registrant of the same name replaces the owner. */
+  registrationsFor(pluginName: string): PluginRegistrations {
+    const owned = (kind: RegistrationKind) =>
+      [...this.registrationOwners[kind].entries()]
+        .filter(([, owner]) => owner === pluginName)
+        .map(([name]) => name)
+        .sort((a, b) => a.localeCompare(b));
+    return {
+      services: owned("services"),
+      tools: owned("tools"),
+      commands: owned("commands"),
+      rpcMethods: owned("rpcMethods"),
+    };
   }
 
   getServiceNames() {
@@ -74,7 +106,7 @@ export default class TokenRingApp {
   }
 
   waitForService<T extends TokenRingService>(type: abstract new (...args: any[]) => T, callback: (item: T) => void) {
-    return this.services.waitFor(type.name, callback as (item: TokenRingService) => void);
+    return this.services.waitFor(type.name, bindRegistration(callback) as (item: TokenRingService) => void);
   }
 
   /**

@@ -7,6 +7,7 @@ import { DebugState, type DebugTargetRef } from "../state/DebugState.ts";
 import type TokenRingApp from "../TokenRingApp.ts";
 import type { TokenRingService } from "../types.ts";
 import { createApplicationSnapshotSource } from "./applicationSnapshotSource.ts";
+import { redactSecretKeys } from "./redactSnapshot.ts";
 import { formatSnapshotTimestamp, isValidSnapshotName, SNAPSHOT_EXTENSION, sanitizeSnapshotLabel } from "./snapshotName.ts";
 
 /** Something the debugger can capture. */
@@ -28,6 +29,8 @@ export interface DebugTarget {
   id: string;
   label: string;
   description: string;
+  /** The owning source's {@link DebugSnapshotSource.displayName}, for grouping targets. Filled in by {@link DebugService.listTargets}. */
+  displayName?: string;
 }
 
 export interface DebugSnapshotInfo {
@@ -39,6 +42,18 @@ export interface DebugSnapshotInfo {
 
 /** How often the recorder re-checks state while idle or between captures. */
 const RECORDER_POLL_INTERVAL_MS = 500;
+
+/**
+ * Names past the newest `keep`, oldest last. Same order as the debug view:
+ * newest `capturedAt` first, then name. null keeps everything.
+ */
+function snapshotsBeyondRetention(snapshots: ReadonlyArray<{ name: string; capturedAt: number }>, keep: number | null): string[] {
+  if (keep === null || keep < 0 || snapshots.length <= keep) return [];
+  return [...snapshots]
+    .sort((a, b) => b.capturedAt - a.capturedAt || b.name.localeCompare(a.name))
+    .slice(keep)
+    .map(snapshot => snapshot.name);
+}
 
 /**
  * Captures debugging snapshots of live app and agent state and writes them to
@@ -67,21 +82,29 @@ export default class DebugService implements TokenRingService {
     return this.app.getWorkspaceResolvedPath("debug");
   }
 
-  /** Everything that can be captured right now. */
+  /** Everything that can be captured right now, each tagged with its source's display name. */
   listTargets(): DebugTarget[] {
-    return this.sources.valuesArray().flatMap(source => source.listTargets());
+    return this.sources.valuesArray().flatMap(source => source.listTargets().map(target => ({ ...target, displayName: source.displayName })));
   }
 
   /**
    * Captures one target and writes it to the debug directory.
    * Returns the snapshot file name, or `null` when the target has gone away.
+   * A successful write, including one from the recording timer, also drops snapshots past `retainLast`.
    */
   async capture(target: DebugTargetRef): Promise<string | null> {
     const dump = this.buildSnapshot(target);
     if (!dump) return null;
 
     const label = `${sanitizeSnapshotLabel(target.kind)}-${sanitizeSnapshotLabel(target.id)}`;
-    return this.writeSnapshot(label, dump);
+    const name = await this.writeSnapshot(label, dump);
+    await this.enforceRetention();
+    return name;
+  }
+
+  /** null keeps every snapshot. Stored immediately; files are removed on the next successful capture. */
+  setRetainLast(retainLast: number | null): void {
+    this.app.mutateState(DebugState, state => state.setRetainLast(retainLast));
   }
 
   async listSnapshots(): Promise<DebugSnapshotInfo[]> {
@@ -193,10 +216,37 @@ export default class DebugService implements TokenRingService {
     }
   }
 
+  /**
+   * Deletes snapshots beyond the newest `retainLast`. No-op when that is null.
+   * One file failing to delete does not stop the rest.
+   */
+  private async enforceRetention(): Promise<void> {
+    const retainLast = this.app.getState(DebugState).retainLast;
+    if (retainLast === null) return;
+
+    let snapshots: DebugSnapshotInfo[];
+    try {
+      snapshots = await this.listSnapshots();
+    } catch {
+      return;
+    }
+
+    for (const name of snapshotsBeyondRetention(snapshots, retainLast)) {
+      try {
+        await this.deleteSnapshot(name);
+      } catch {
+        // One file failing must not stop the rest from being removed.
+      }
+    }
+  }
+
   /** Builds the snapshot envelope for a target, or `undefined` when it is gone. */
   private buildSnapshot(target: DebugTargetRef): Record<string, unknown> | undefined {
-    const data = this.sources.get(target.kind)?.captureTarget(target.id);
-    if (data === undefined) return undefined;
+    const captured = this.sources.get(target.kind)?.captureTarget(target.id);
+    if (captured === undefined) return undefined;
+    // Round-trip through JSON first so class instances become plain objects the
+    // key-name redaction can see into; this is what gets written anyway.
+    const data = redactSecretKeys(JSON.parse(JSON.stringify(captured)) as unknown);
 
     return {
       capturedAt: new Date().toISOString(),

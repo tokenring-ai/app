@@ -494,7 +494,7 @@ class DebugService implements TokenRingService {
 |--------|-------------|
 | registerSnapshotSource(source) | Register a capture source. Application state is registered as the `app` source on construction. |
 | getDebugDirectory() | Return `getWorkspaceResolvedPath("debug")`. The directory is created lazily on first capture. |
-| listTargets() | Return every registered source's targets. |
+| listTargets() | Return every registered source's targets, each tagged with its source's `displayName` (for grouping in the UI; the RPC `DebugTargetSchema` must carry the field for it to reach the browser). |
 | capture(target) | Capture one target and write `<kind>-<id>-<timestamp>.json`. Returns the file name, or `null` when the target no longer exists. |
 | listSnapshots() | List snapshots newest first with `name`, `kind`, `sizeBytes`, and `capturedAt`. |
 | readSnapshot(name) | Return the raw JSON text, or `null` when missing or when the name is invalid. |
@@ -792,7 +792,7 @@ The package ships two RPC endpoints, built with `createRPCEndpoint` from `@token
 
 | Method | Type | Description |
 |--------|------|-------------|
-| listPlugins | query | List installed plugins with name, displayName, version, description, and hasConfig. |
+| listPlugins | query | List installed plugins with name, displayName, version, description, and hasConfig, plus whether a restart is needed to fully apply config. |
 | getLogs | query | Return all log entries. |
 | streamLogs | stream | Stream log entries appended after a position. |
 | listDebugTargets | query | List everything that can be captured right now. |
@@ -819,6 +819,9 @@ The package ships two RPC endpoints, built with `createRPCEndpoint` from `@token
     description: string;
     hasConfig: boolean; // true when the plugin declares a configSchema
   }>;
+  // AppConfigurationState.requiresRestartToFullyApplyConfig: a config change touched a
+  // plugin that cannot be reconfigured live. Sticky until the app restarts.
+  requiresRestart: boolean;
 }
 ```
 

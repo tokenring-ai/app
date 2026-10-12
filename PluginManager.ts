@@ -1,6 +1,7 @@
 import deepClone from "@tokenring-ai/utility/object/deepClone";
 import KeyedRegistry from "@tokenring-ai/utility/registry/KeyedRegistry";
 import { deepEquals } from "bun";
+import { runAsPlugin } from "./registrationOwner.ts";
 import { AppConfigurationState, type ConfigLayer } from "./state/AppConfigurationState.ts";
 import type TokenRingApp from "./TokenRingApp";
 import type { TokenRingPlugin, TokenRingService } from "./types";
@@ -40,9 +41,10 @@ export default class PluginManager implements TokenRingService {
 
     for (const plugin of plugins) {
       try {
-        if (plugin.earlyInstall) {
+        const earlyInstall = plugin.earlyInstall;
+        if (earlyInstall) {
           this.app.serviceOutput(this, `Early Installing plugin "${plugin.name}"`);
-          await plugin.earlyInstall(this.app, this.immutableConfigFor(plugin));
+          await this.asPlugin(plugin, () => earlyInstall(this.app, this.immutableConfigFor(plugin)));
         }
       } catch (error: unknown) {
         this.app.serviceError(this, `Error early installing plugin "${plugin.name}":`, error);
@@ -52,9 +54,10 @@ export default class PluginManager implements TokenRingService {
 
     for (const plugin of plugins) {
       try {
-        if (plugin.install) {
+        const install = plugin.install;
+        if (install) {
           this.app.serviceOutput(this, `Installing plugin "${plugin.name}"`);
-          await plugin.install(this.app, this.immutableConfigFor(plugin));
+          await this.asPlugin(plugin, () => install(this.app, this.immutableConfigFor(plugin)));
         }
         this.plugins.set(plugin.name, plugin);
       } catch (error: unknown) {
@@ -65,9 +68,10 @@ export default class PluginManager implements TokenRingService {
 
     for (const plugin of plugins) {
       try {
-        if (plugin.reconfigure) {
+        const reconfigure = plugin.reconfigure;
+        if (reconfigure) {
           this.app.serviceOutput(this, `Configuring plugin "${plugin.name}"`);
-          await plugin.reconfigure(this.app, this.configFor(plugin));
+          await this.asPlugin(plugin, () => reconfigure(this.app, this.configFor(plugin)));
         }
         this.plugins.set(plugin.name, plugin);
       } catch (error: unknown) {
@@ -78,9 +82,10 @@ export default class PluginManager implements TokenRingService {
 
     for (const plugin of plugins) {
       try {
-        if (plugin.start) {
+        const start = plugin.start;
+        if (start) {
           this.app.serviceOutput(this, `Starting plugin "${plugin.name}"`);
-          await plugin.start(this.app);
+          await this.asPlugin(plugin, () => start(this.app));
         }
       } catch (error: unknown) {
         this.app.serviceError(this, `Error starting plugin "${plugin.name}":`, error);
@@ -107,9 +112,10 @@ export default class PluginManager implements TokenRingService {
       if (deepEquals(this.appliedConfigs.get(plugin.name), newConfigSlice, true)) continue;
 
       const config = this.configFor(plugin);
-      if (plugin.reconfigure) {
+      const reconfigure = plugin.reconfigure;
+      if (reconfigure) {
         this.app.serviceOutput(this, `Reconfiguring plugin "${plugin.name}"`);
-        await plugin.reconfigure(this.app, config);
+        await this.asPlugin(plugin, () => reconfigure(this.app, config));
       } else {
         this.app.serviceOutput(this, `Plugin "${plugin.name}" does not support live reconfiguration`);
         restartRequired = true;
@@ -122,6 +128,11 @@ export default class PluginManager implements TokenRingService {
         state.requiresRestartToFullyApplyConfig = true;
       });
     }
+  }
+
+  /** Registration sites read the active plugin from this frame, including deferred `waitForService` callbacks. */
+  private asPlugin<T>(plugin: TokenRingPlugin<any, any>, fn: () => T): T {
+    return runAsPlugin(this.app, plugin.name, fn);
   }
 
   /** Parses the plugin's boot-time slice from `app.initialConfig`, or `undefined` when none is declared. */

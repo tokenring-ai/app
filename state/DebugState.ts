@@ -17,15 +17,16 @@ const serializationSchema = z.object({
   captureCount: z.number().default(0),
   lastSnapshot: z.string().nullable().default(null),
   lastError: z.string().nullable().default(null),
+  /** Newest snapshots to keep after each capture. null keeps every snapshot. */
+  retainLast: z.number().int().nonnegative().nullable().default(null),
 });
 
 /** Shortest recording interval the UI is allowed to request. */
 export const MIN_RECORDING_INTERVAL_MS = 1000;
 
 /**
- * Tracks the debug recorder: whether it is running, what it captures, and how
- * the most recent capture went. Only the recorder writes to this slice; the
- * debugging UI reads it to drive the record button.
+ * Tracks the debug recorder and how many snapshots to keep. The recorder writes
+ * capture status; `retainLast` is the keep-last setting (null keeps everything).
  */
 export class DebugState extends AppStateSlice<typeof serializationSchema> {
   recording = false;
@@ -36,6 +37,7 @@ export class DebugState extends AppStateSlice<typeof serializationSchema> {
   captureCount = 0;
   lastSnapshot: string | null = null;
   lastError: string | null = null;
+  retainLast: number | null = null;
 
   constructor() {
     super("DebugState", serializationSchema);
@@ -51,6 +53,7 @@ export class DebugState extends AppStateSlice<typeof serializationSchema> {
       captureCount: this.captureCount,
       lastSnapshot: this.lastSnapshot,
       lastError: this.lastError,
+      retainLast: this.retainLast,
     };
   }
 
@@ -63,6 +66,7 @@ export class DebugState extends AppStateSlice<typeof serializationSchema> {
     this.captureCount = data.captureCount;
     this.lastSnapshot = data.lastSnapshot;
     this.lastError = data.lastError;
+    this.retainLast = data.retainLast;
   }
 
   start(targets: DebugTargetRef[], intervalMs: number): void {
@@ -90,5 +94,10 @@ export class DebugState extends AppStateSlice<typeof serializationSchema> {
   recordFailure(error: string): void {
     this.lastCaptureAt = Date.now();
     this.lastError = error;
+  }
+
+  /** null keeps every snapshot. Pruning happens on the next successful capture, not here. */
+  setRetainLast(retainLast: number | null): void {
+    this.retainLast = retainLast;
   }
 }

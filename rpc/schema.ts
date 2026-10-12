@@ -12,6 +12,8 @@ export const DebugTargetSchema = z.object({
   id: z.string(),
   label: z.string(),
   description: z.string(),
+  /** Name of the snapshot source the target belongs to, used to group targets. */
+  displayName: z.string().exactOptional(),
 });
 
 export const DebugSnapshotInfoSchema = z.object({
@@ -30,6 +32,8 @@ export const DebugRecordingStatusSchema = z.object({
   captureCount: z.number(),
   lastSnapshot: z.string().nullable(),
   lastError: z.string().nullable(),
+  /** Newest snapshots to keep after each capture. null keeps every snapshot. */
+  retainLast: z.number().int().nonnegative().nullable(),
 });
 
 export type DebugTarget = z.infer<typeof DebugTargetSchema>;
@@ -51,8 +55,15 @@ const AppRpcSchema = {
             version: z.string(),
             description: z.string(),
             hasConfig: z.boolean(),
+            services: z.array(z.string()),
+            tools: z.array(z.string()),
+            commands: z.array(z.string()),
+            /** `${endpoint.path}.${methodName}`, the id RpcService dispatches. */
+            rpcMethods: z.array(z.string()),
           }),
         ),
+        /** True once a config change touched a plugin that cannot be reconfigured live (sticky until restart). */
+        requiresRestart: z.boolean().default(false),
       }),
     },
     getLogs: {
@@ -120,6 +131,14 @@ const AppRpcSchema = {
     streamDebugRecording: {
       type: "stream" as const,
       input: z.object({}),
+      result: DebugRecordingStatusSchema,
+    },
+    setDebugRetention: {
+      type: "mutation" as const,
+      input: z.object({
+        /** Newest snapshots to keep after each capture. null keeps every snapshot. */
+        retainLast: z.number().int().nonnegative().nullable(),
+      }),
       result: DebugRecordingStatusSchema,
     },
   },
