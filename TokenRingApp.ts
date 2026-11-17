@@ -191,18 +191,22 @@ export default class TokenRingApp {
 
       const stopShutdownMonitor = this.startShutdownMonitor();
       try {
-        const stopResults = await Promise.allSettled(
-          this.services.valuesArray().map(async service => {
-            if (!service.stop) return;
+        const stopService = async (service: TokenRingService) => {
+          if (!service.stop) return;
 
-            this.stoppingServices.add(service);
-            try {
-              await service.stop();
-            } finally {
-              this.stoppingServices.delete(service);
-            }
-          }),
-        );
+          this.stoppingServices.add(service);
+          try {
+            await service.stop();
+          } finally {
+            this.stoppingServices.delete(service);
+          }
+        };
+        // Services stop together, except those that declare `stopsLast`, which wait for everything else.
+        const all = this.services.valuesArray();
+        const stopResults = [
+          ...(await Promise.allSettled(all.filter(service => !service.stopsLast).map(stopService))),
+          ...(await Promise.allSettled(all.filter(service => service.stopsLast).map(stopService))),
+        ];
 
         const stopErrors = stopResults.filter((result): result is PromiseRejectedResult => result.status === "rejected").map(result => result.reason);
 

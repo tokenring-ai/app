@@ -186,6 +186,76 @@ describe("TokenRingApp", () => {
       expect(lifecycleEvents).toEqual(["stop"]);
     });
 
+    it("should stop a stopsLast service only after every other service has finished stopping", async () => {
+      const events: string[] = [];
+
+      class Store implements TokenRingService {
+        name = "Store";
+        description = "A store other services write to while stopping";
+        readonly stopsLast = true;
+        async stop() {
+          events.push("store closed");
+        }
+      }
+
+      class Writer implements TokenRingService {
+        name = "Writer";
+        description = "Saves its final state while stopping";
+        async run(signal: AbortSignal) {
+          await delay(10000, null, { signal }).catch(() => {});
+        }
+        async stop() {
+          events.push("writer saving");
+          await delay(30);
+          events.push("writer saved");
+        }
+      }
+
+      // The store is registered FIRST, the order that used to let it close under the writer.
+      app.addService(Store, new Store());
+      app.addService(Writer, new Writer());
+
+      const runPromise = app.run();
+      await delay(20);
+      app.shutdown();
+      await runPromise;
+
+      expect(events).toEqual(["writer saving", "writer saved", "store closed"]);
+    });
+
+    it("should still stop a stopsLast service when another service fails to stop", async () => {
+      const closed = mock();
+
+      class Store implements TokenRingService {
+        name = "Store";
+        description = "Store";
+        readonly stopsLast = true;
+        async stop() {
+          closed();
+        }
+      }
+
+      class Broken implements TokenRingService {
+        name = "Broken";
+        description = "Fails to stop";
+        async run(signal: AbortSignal) {
+          await delay(10000, null, { signal }).catch(() => {});
+        }
+        async stop() {
+          throw new Error("Stop failed");
+        }
+      }
+
+      app.addService(Store, new Store());
+      app.addService(Broken, new Broken());
+
+      const runPromise = app.run();
+      await delay(20);
+      app.shutdown();
+      await expect(runPromise).rejects.toThrow("Stop failed");
+      expect(closed).toHaveBeenCalledTimes(1);
+    });
+
     it("should stop services after startup failures", async () => {
       const stop = mock();
 

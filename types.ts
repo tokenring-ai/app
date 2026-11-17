@@ -33,6 +33,12 @@ export interface TokenRingService {
 
   stop?(): MaybePromise<void>;
 
+  /**
+   * Stop after every other service has finished stopping. For stores that other services write to while they shut
+   * down (a database holding the shutdown checkpoint, say): closing one first makes those last writes fail.
+   */
+  readonly stopsLast?: boolean;
+
   attach?(agent: Agent, creationContext: AgentCreationContext): void;
 
   detach?(agent: Agent): void;

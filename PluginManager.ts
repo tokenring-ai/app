@@ -26,7 +26,11 @@ export default class PluginManager implements TokenRingService {
 
   async run(signal: AbortSignal) {
     for await (const _state of this.app.subscribeStateAsync(AppConfigurationState, signal)) {
-      await this.reconfigurePlugins();
+      try {
+        await this.reconfigurePlugins();
+      } catch {
+        // Already reported per plugin; failed plugins are retried on the next pass.
+      }
     }
   }
 
@@ -71,7 +75,12 @@ export default class PluginManager implements TokenRingService {
         const reconfigure = plugin.reconfigure;
         if (reconfigure) {
           this.app.serviceOutput(this, `Configuring plugin "${plugin.name}"`);
-          await this.asPlugin(plugin, () => reconfigure(this.app, this.configFor(plugin)));
+          const { config, snapshot } = this.configFor(plugin);
+          await this.asPlugin(plugin, () => reconfigure(this.app, config));
+          this.recordAppliedConfig(plugin, snapshot);
+        } else if ("configSchema" in plugin) {
+          // Boot config is what a plugin without live reconfiguration runs with.
+          this.recordAppliedConfig(plugin, this.configFor(plugin).snapshot);
         }
         this.plugins.set(plugin.name, plugin);
       } catch (error: unknown) {
@@ -100,25 +109,37 @@ export default class PluginManager implements TokenRingService {
    * Hands the current merged configuration to every installed plugin whose
    * config slice changed since it last received one. Plugins that cannot be
    * reconfigured while running flag the app as needing a restart.
+   *
+   * A plugin whose reconfigure throws is reported and skipped — the rest of the
+   * pass still runs, and since its snapshot is not recorded the next pass retries
+   * it. Once the pass completes the failure is rethrown (an AggregateError when
+   * several plugins failed) so callers such as ConfigurationService can roll back.
    */
   async reconfigurePlugins(): Promise<void> {
-    const { mergedConfig } = this.app.getState(AppConfigurationState);
     let restartRequired = false;
+    const errors: unknown[] = [];
 
     for (const plugin of this.plugins.valuesArray()) {
       if (!("configSchema" in plugin)) continue;
 
-      const newConfigSlice = plugin.configSchema.parse(mergedConfig) as unknown;
-      if (deepEquals(this.appliedConfigs.get(plugin.name), newConfigSlice, true)) continue;
+      // Each plugin is handled on its own: one failing reconfigure must not skip the
+      // rest of the pass, and its snapshot is left unrecorded so the next pass retries it.
+      try {
+        const { config, snapshot } = this.configFor(plugin);
+        if (deepEquals(this.appliedConfigs.get(plugin.name), snapshot, true)) continue;
 
-      const config = this.configFor(plugin);
-      const reconfigure = plugin.reconfigure;
-      if (reconfigure) {
-        this.app.serviceOutput(this, `Reconfiguring plugin "${plugin.name}"`);
-        await this.asPlugin(plugin, () => reconfigure(this.app, config));
-      } else {
-        this.app.serviceOutput(this, `Plugin "${plugin.name}" does not support live reconfiguration`);
-        restartRequired = true;
+        const reconfigure = plugin.reconfigure;
+        if (reconfigure) {
+          this.app.serviceOutput(this, `Reconfiguring plugin "${plugin.name}"`);
+          await this.asPlugin(plugin, () => reconfigure(this.app, config));
+        } else {
+          this.app.serviceOutput(this, `Plugin "${plugin.name}" does not support live reconfiguration`);
+          restartRequired = true;
+        }
+        this.recordAppliedConfig(plugin, snapshot);
+      } catch (error: unknown) {
+        this.app.serviceError(this, `Error reconfiguring plugin "${plugin.name}":`, error);
+        errors.push(error);
       }
     }
 
@@ -128,6 +149,9 @@ export default class PluginManager implements TokenRingService {
         state.requiresRestartToFullyApplyConfig = true;
       });
     }
+
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, `${errors.length} plugins failed to reconfigure`);
   }
 
   /** Registration sites read the active plugin from this frame, including deferred `waitForService` callbacks. */
@@ -142,16 +166,20 @@ export default class PluginManager implements TokenRingService {
 
   /**
    * Parses the plugin's slice out of the merged config, as two independent
-   * copies: one is returned for the plugin — which is free to mutate it, as
-   * plugins filling in defaults from the environment do — and one is kept
-   * private as the change-detection snapshot.
+   * copies: `config` is handed to the plugin — which is free to mutate it, as
+   * plugins filling in defaults from the environment do — and `snapshot` is
+   * kept private as the change-detection baseline. The snapshot is only
+   * recorded (via {@link recordAppliedConfig}) once the plugin accepted it.
    */
-  private configFor(plugin: TokenRingPlugin<any, any>): unknown {
-    if (!("configSchema" in plugin)) return {};
+  private configFor(plugin: TokenRingPlugin<any, any>): { config: unknown; snapshot: unknown } {
+    if (!("configSchema" in plugin)) return { config: {}, snapshot: {} };
 
     const { mergedConfig } = this.app.getState(AppConfigurationState);
     const parsed = plugin.configSchema.parse(mergedConfig) as unknown;
-    this.appliedConfigs.set(plugin.name, deepClone(parsed));
-    return parsed;
+    return { config: parsed, snapshot: deepClone(parsed) };
+  }
+
+  private recordAppliedConfig(plugin: TokenRingPlugin<any, any>, snapshot: unknown): void {
+    this.appliedConfigs.set(plugin.name, snapshot);
   }
 }

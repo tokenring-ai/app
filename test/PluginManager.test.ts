@@ -407,6 +407,48 @@ describe("PluginManager", () => {
       expect(install).toHaveBeenCalledWith(mockApp, { boot: { restore: true } });
     });
 
+    it("does not flag a restart for an unchanged plugin without live reconfiguration", async () => {
+      await pluginManager.installPlugins([makePlugin()]);
+      await pluginManager.reconfigurePlugins();
+      expect(mockApp.stateManager.getState(AppConfigurationState).requiresRestartToFullyApplyConfig).toBe(false);
+    });
+
+    it("retries a plugin whose reconfigure threw and still reconfigures the plugins after it", async () => {
+      let fail = false;
+      const failing = mock().mockImplementation(() => {
+        if (fail) throw new Error("reconfigure failed");
+      });
+      const following = mock();
+      const first = makePlugin({ name: "first", reconfigure: failing });
+      const second = makePlugin({ name: "second", reconfigure: following });
+      await pluginManager.installPlugins([first, second]);
+      expect(failing).toHaveBeenCalledTimes(1);
+      expect(following).toHaveBeenCalledTimes(1);
+
+      const serviceErrorSpy = spyOn(mockApp, "serviceError");
+      fail = true;
+      AppConfigurationState.setUserConfig(mockApp, { widget: { color: "blue" } });
+      // The failure is rethrown after the whole pass, so callers can roll back.
+      await expect(pluginManager.reconfigurePlugins()).rejects.toThrow("reconfigure failed");
+
+      expect(serviceErrorSpy).toHaveBeenCalledWith(pluginManager, expect.stringContaining('Error reconfiguring plugin "first"'), expect.any(Error));
+      expect(failing).toHaveBeenCalledTimes(2);
+      // The failure did not abort the pass.
+      expect(following).toHaveBeenCalledTimes(2);
+      expect(following).toHaveBeenLastCalledWith(mockApp, { widget: { size: 4, color: "blue" } });
+
+      // Same config again: the failed plugin is retried, the applied one is not.
+      fail = false;
+      await pluginManager.reconfigurePlugins();
+      expect(failing).toHaveBeenCalledTimes(3);
+      expect(failing).toHaveBeenLastCalledWith(mockApp, { widget: { size: 4, color: "blue" } });
+      expect(following).toHaveBeenCalledTimes(2);
+
+      // Once applied, it is not reconfigured again.
+      await pluginManager.reconfigurePlugins();
+      expect(failing).toHaveBeenCalledTimes(3);
+    });
+
     it("flags a restart when a changed plugin cannot be reconfigured live", async () => {
       await pluginManager.installPlugins([makePlugin()]);
       const state = mockApp.stateManager.getState(AppConfigurationState);

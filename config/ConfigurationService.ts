@@ -145,7 +145,24 @@ export default class ConfigurationService implements TokenRingService {
    * calls run one at a time.
    */
   apply(scope: ConfigScope, candidateOverrides: ConfigLayer): Promise<ConfigApplyResult> {
-    const run = this.applyQueue.then(() => this.doApply(scope, candidateOverrides));
+    return this.enqueue(() => this.doApply(scope, candidateOverrides));
+  }
+
+  /**
+   * Read-modify-write of one scope's overrides, atomic against other applies and updates: `mutate`
+   * gets a copy of the overrides as they are when its turn comes, so concurrent updates (two
+   * grants saved at once) cannot overwrite each other the way `getOverrides` + `apply` can.
+   */
+  update(scope: ConfigScope, mutate: (overrides: ConfigLayer) => void): Promise<ConfigApplyResult> {
+    return this.enqueue(() => {
+      const next = this.getOverrides(scope);
+      mutate(next);
+      return this.doApply(scope, next);
+    });
+  }
+
+  private enqueue(task: () => Promise<ConfigApplyResult>): Promise<ConfigApplyResult> {
+    const run = this.applyQueue.then(task);
     this.applyQueue = run.then(
       () => {},
       () => {},
